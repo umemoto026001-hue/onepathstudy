@@ -4,69 +4,52 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 const SUBJECTS = ["英語", "数学", "物理", "化学"];
+const CAMPUSES = ["オンライン校"];
 
-const UNIVERSITIES = [
-  "東京都立大学",
-  "横浜国立大学",
-  "埼玉大学",
-  "静岡大学",
-  "三重大学",
-  "富山大学",
-  "大阪公立大学",
-  "兵庫県立大学",
-  "広島大学",
+const EMPLOYEES: {
+  name: string;
+  employeeNumber: string;
+  role: "TEACHER" | "STAFF" | "HQ" | "EXECUTIVE";
+}[] = [
+  { name: "梅本隼人", employeeNumber: "026001", role: "EXECUTIVE" },
+  { name: "木村朝陽", employeeNumber: "026002", role: "EXECUTIVE" },
+  { name: "宮坂優里", employeeNumber: "026003", role: "HQ" },
 ];
 
 async function main() {
-  const subjects = new Map<string, string>();
   for (const name of SUBJECTS) {
-    const subject = await prisma.subject.upsert({
+    await prisma.subject.upsert({ where: { name }, update: {}, create: { name } });
+  }
+
+  const campuses = new Map<string, string>();
+  for (const name of CAMPUSES) {
+    const campus = await prisma.campus.upsert({
       where: { name },
       update: {},
       create: { name },
     });
-    subjects.set(name, subject.id);
+    campuses.set(name, campus.id);
   }
+  const defaultCampusId = campuses.get(CAMPUSES[0]);
 
-  for (const name of UNIVERSITIES) {
-    await prisma.university.upsert({
-      where: { name },
+  const initialPasswordHash = await bcrypt.hash("onepath", 10);
+
+  for (const employee of EMPLOYEES) {
+    await prisma.user.upsert({
+      where: { employeeNumber: employee.employeeNumber },
       update: {},
-      create: { name },
+      create: {
+        name: employee.name,
+        employeeNumber: employee.employeeNumber,
+        role: employee.role,
+        passwordHash: initialPasswordHash,
+        mustChangePassword: true,
+        campusId: defaultCampusId,
+      },
     });
   }
 
-  const devPassword = await bcrypt.hash("onepath2027", 10);
-
-  await prisma.user.upsert({
-    where: { email: "umemoto@onepathstudy.com" },
-    update: {},
-    create: {
-      name: "梅本隼人",
-      email: "umemoto@onepathstudy.com",
-      passwordHash: devPassword,
-      role: "ADMIN",
-      subjects: {
-        connect: [{ id: subjects.get("英語") }, { id: subjects.get("化学") }],
-      },
-    },
-  });
-
-  await prisma.user.upsert({
-    where: { email: "kimura@onepathstudy.com" },
-    update: {},
-    create: {
-      name: "木村朝陽",
-      email: "kimura@onepathstudy.com",
-      passwordHash: devPassword,
-      role: "ADMIN",
-      subjects: {
-        connect: [{ id: subjects.get("数学") }, { id: subjects.get("物理") }],
-      },
-    },
-  });
-
-  console.log("Seed data created. Dev login password for both users: onepath2027");
+  console.log("Seed data created. 初期パスワードは全員共通で「onepath」（初回ログイン時に変更必須）");
 }
 
 main()
