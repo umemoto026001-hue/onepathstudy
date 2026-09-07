@@ -1,13 +1,15 @@
-# One Path Study 基幹管理アプリ
+# One Path Study 基幹運営アプリ
 
-生徒管理・授業スケジュール・演習問題データベース・進捗記録を一元管理する、
-One Path Study の運営者向け管理システムです。詳細な仕様は設計書を参照してください。
+集団指導形式の大学受験塾「One Path Study」向けの基幹運営システムです。
+生徒名簿・クラス編成/授業スケジュール・出欠管理・演習/要約提出トラッキング・
+月次面談記録・社内タスク/相談機能の MVP 6機能（提案書 3-1〜3-6）を実装して
+います。詳細な仕様は提案書を参照してください。
 
 ## 技術スタック
 
 - Next.js (App Router / TypeScript) + Tailwind CSS v4
 - Prisma ORM + SQLite（`prisma/dev.db`。将来的に PostgreSQL 等へ移行しやすい構成）
-- NextAuth (Auth.js) v5 Credentials Provider によるメール＋パスワード認証
+- NextAuth (Auth.js) v5 Credentials Provider による社員番号＋パスワード認証
 
 ## セットアップ
 
@@ -15,19 +17,22 @@ One Path Study の運営者向け管理システムです。詳細な仕様は�
 npm install
 cp .env.example .env   # NEXTAUTH_SECRET を発行して設定してください
 npx prisma migrate dev # DBマイグレーションを適用
-npm run db:seed        # 科目・対象大学マスタと初期ユーザーを投入
+npm run db:seed        # 科目マスタ・校舎マスタと初期社員アカウントを投入
 npm run dev
 ```
 
-`http://localhost:3000` を開き、以下のシードアカウントでログインできます。
+`http://localhost:3000` を開き、以下のシードアカウント（社員番号でログイン）
+で入れます。初期パスワードは全員共通で `onepath` で、初回ログイン時に
+パスワード変更が必須です（変更が完了するまで他の画面には進めません）。
 
-| 氏名 | メールアドレス | パスワード |
+| 氏名 | 社員番号 | 役職 |
 |---|---|---|
-| 梅本隼人 | umemoto@onepathstudy.com | onepath2027 |
-| 木村朝陽 | kimura@onepathstudy.com | onepath2027 |
+| 梅本隼人 | 026001 | 役員 |
+| 木村朝陽 | 026002 | 役員 |
+| 宮坂優里 | 026003 | 本部社員 |
 
-初期パスワードは開発用の仮パスワードです。本番運用前に変更、または
-`/settings` の講師アカウント編集からパスワードを再設定してください。
+新しい社員の追加・役職変更・パスワードリセットは、役員アカウントで
+`/settings` から行えます。
 
 ## 主なコマンド
 
@@ -37,7 +42,7 @@ npm run dev
 | `npm run build` / `npm run start` | 本番ビルド / 起動 |
 | `npm run lint` | ESLint |
 | `npx prisma migrate dev` | マイグレーション作成・適用（開発用） |
-| `npm run db:seed` | シードデータ投入（科目・対象大学マスタ、初期ユーザー） |
+| `npm run db:seed` | シードデータ投入（科目・校舎マスタ、初期社員） |
 | `npx prisma studio` | DBの中身をブラウザで確認 |
 
 ## 環境変数
@@ -58,21 +63,35 @@ npm run dev
 - 本番デプロイ時は `npx prisma migrate deploy` でマイグレーションを適用し、
   初回のみ `npm run db:seed` を実行してください。
 
+## 役職別アクセス範囲（提案書 3-7）
+
+`lib/permissions.ts` に集約しています。
+
+| 役職 | 範囲 |
+|---|---|
+| 講師 (TEACHER) | 自分が担当するクラスの出欠・演習提出のみ。生徒名簿・設定は非表示。タスク/相談は自分が担当者・作成者・投稿者のもののみ閲覧可 |
+| 校舎スタッフ (STAFF) | 所属校舎の生徒名簿・クラス・出欠・演習提出。タスク/相談は講師と同様に自分の関与分のみ |
+| 本部社員 (HQ) | 全校舎の生徒・クラス・出欠・演習提出・タスク・相談を横断閲覧（設定は不可） |
+| 役員 (EXECUTIVE) | 全機能に加え、社員・役職・校舎・科目マスタの管理（`/settings`）、相談ステータスの管理者権限 |
+
 ## ディレクトリ構成の要点
 
-- `app/(app)/` … ログイン後の画面（ダッシュボード・生徒管理・スケジュール・
-  演習データベース・進捗記録・設定）
+- `app/(app)/` … ログイン後の画面（ダッシュボード・タスク/相談・生徒名簿・
+  クラス・出欠・演習提出・面談記録・設定）
 - `app/actions/` … 各機能の Server Actions（フォーム送信の処理）
 - `auth.ts` / `auth.config.ts` / `proxy.ts` … 認証とルート保護
   （Next.js 16 では `middleware.ts` が `proxy.ts` に名称変更されています）
-- `prisma/schema.prisma` … データモデル定義
+- `lib/permissions.ts` / `lib/classAccess.ts` … 役職別アクセス制御ロジック
+- `prisma/schema.prisma` … データモデル定義（前提や判断の根拠はファイル内コメント参照）
 
-## 設計判断メモ
+## 設計判断メモ（提案書に明記のない項目）
 
-- 設計書では `ProgressLog.relatedProblemIds` を配列フィールドとしていますが、
-  SQLite が scalar list 型をサポートしないため、`Problem` と `ProgressLog` の
-  多対多リレーションとして実装しています（意味的には同一です）。
-- 対象大学は `Student.targetUniversity` / `Problem.university` が自由入力
-  項目である一方、設定画面から候補マスタ（`University`）を編集できるように
-  しています。フォームでは自由入力＋マスタ候補の入力補完（datalist）を
-  併用しています。
+ユーザーへの確認を経て以下の方針で実装しています。
+
+- 個人宛タスクのステータスは「未対応 / 対応中 / 完了」の3段階。
+- 相談・クレームに返信スレッド機能は設けず、投稿とステータス変更のみ。
+- 相談・クレームは生徒への任意紐付けが可能（生徒名簿と連携、必須ではない）。
+- 校舎（キャンパス）は最初から複数校舎に対応するデータ構造を用意（`Campus` モデル）。
+
+その他、提案書に記載のない実装判断は `prisma/schema.prisma` 冒頭のコメントに
+まとめています（例: `ClassSession` の追加理由、生徒の在籍ステータス追加など）。
