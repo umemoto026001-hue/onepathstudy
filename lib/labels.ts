@@ -1,4 +1,14 @@
-import type { ConsultationStatus, TaskStatus } from "@prisma/client";
+import type { ConsultationStatus, StudentStatus, TaskStatus } from "@prisma/client";
+
+export const STUDENT_STATUS_LABEL: Record<StudentStatus, string> = {
+  ENROLLED: "在籍中",
+  WITHDRAWN: "退会",
+};
+
+export const STUDENT_STATUS_BADGE: Record<StudentStatus, "navy" | "coral" | "gold" | "gray" | "green"> = {
+  ENROLLED: "green",
+  WITHDRAWN: "gray",
+};
 
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   TODO: "未対応",
