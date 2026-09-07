@@ -91,7 +91,7 @@ export default async function StudentDetailPage({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-heading text-lg font-bold text-navy">授業スケジュール</h2>
             <Link href={`/schedule/new?studentId=${student.id}`} className="text-sm text-coral underline">
               + 予定を追加

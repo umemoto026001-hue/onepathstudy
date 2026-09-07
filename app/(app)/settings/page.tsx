@@ -63,7 +63,7 @@ export default async function SettingsPage({
       </Card>
 
       <Card>
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-heading text-lg font-bold text-navy">利用者（講師アカウント）</h2>
           {!newUser && !editingUser && (
             <LinkButton href="/settings?newUser=1">+ 講師を追加する</LinkButton>

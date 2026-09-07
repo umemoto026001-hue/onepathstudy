@@ -2,6 +2,10 @@ import type { NextAuthConfig } from "next-auth";
 
 // Edge-safe config used by middleware (no Prisma / bcrypt here).
 export const authConfig = {
+  // Vercel deployments (production + preview URLs) don't have a single
+  // fixed origin, so trust the incoming request host instead of requiring
+  // NEXTAUTH_URL to match exactly.
+  trustHost: true,
   pages: {
     signIn: "/",
   },
