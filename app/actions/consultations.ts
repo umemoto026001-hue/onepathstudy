@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageConsultationStatus } from "@/lib/permissions";
+import { sendNotificationEmail } from "@/lib/email";
+import { getAppUrl } from "@/lib/appUrl";
 
 const consultationSchema = z.object({
   title: z.string().min(1, "件名を入力してください"),
@@ -32,7 +34,7 @@ export async function createConsultation(
   }
   const data = result.data;
 
-  await prisma.consultation.create({
+  const consultation = await prisma.consultation.create({
     data: {
       title: data.title,
       content: data.content,
@@ -40,6 +42,13 @@ export async function createConsultation(
       assigneeId: data.assigneeId,
       studentId: data.studentId || null,
     },
+    include: { assignee: true, poster: true },
+  });
+
+  await sendNotificationEmail({
+    to: consultation.assignee.email,
+    subject: `【One Path Study】新しい相談・クレーム: ${consultation.title}`,
+    text: `${consultation.poster.name}さんから相談・クレームが投稿されました。\n\n件名: ${consultation.title}\n内容: ${consultation.content}\n\n${await getAppUrl("/tasks?tab=consultations")}`,
   });
 
   revalidatePath("/tasks");

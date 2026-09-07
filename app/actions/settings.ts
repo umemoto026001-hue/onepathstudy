@@ -80,6 +80,7 @@ export async function deleteCampus(id: string) {
 const userSchema = z.object({
   name: z.string().min(1, "氏名を入力してください"),
   employeeNumber: z.string().min(1, "社員番号を入力してください"),
+  email: z.string().email("有効なメールアドレスを入力してください").optional().or(z.literal("")),
   role: z.enum(["TEACHER", "STAFF", "HQ", "EXECUTIVE"]),
   campusId: z.string().optional(),
 });
@@ -91,6 +92,7 @@ export async function createUser(
   const result = userSchema.safeParse({
     name: formData.get("name"),
     employeeNumber: formData.get("employeeNumber"),
+    email: formData.get("email") || undefined,
     role: formData.get("role"),
     campusId: formData.get("campusId") || undefined,
   });
@@ -107,6 +109,7 @@ export async function createUser(
     data: {
       name: data.name,
       employeeNumber: data.employeeNumber,
+      email: data.email || null,
       role: data.role,
       campusId: data.campusId || null,
       passwordHash,
@@ -126,6 +129,7 @@ export async function updateUser(
   const result = userSchema.safeParse({
     name: formData.get("name"),
     employeeNumber: formData.get("employeeNumber"),
+    email: formData.get("email") || undefined,
     role: formData.get("role"),
     campusId: formData.get("campusId") || undefined,
   });
@@ -144,6 +148,7 @@ export async function updateUser(
     data: {
       name: data.name,
       employeeNumber: data.employeeNumber,
+      email: data.email || null,
       role: data.role,
       campusId: data.campusId || null,
     },

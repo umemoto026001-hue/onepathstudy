@@ -10,8 +10,9 @@ const EMPLOYEES: {
   name: string;
   employeeNumber: string;
   role: "TEACHER" | "STAFF" | "HQ" | "EXECUTIVE";
+  email?: string;
 }[] = [
-  { name: "梅本隼人", employeeNumber: "026001", role: "EXECUTIVE" },
+  { name: "梅本隼人", employeeNumber: "026001", role: "EXECUTIVE", email: "umemoto026001@onepathstudy.com" },
   { name: "木村朝陽", employeeNumber: "026002", role: "EXECUTIVE" },
   { name: "宮坂優里", employeeNumber: "026003", role: "HQ" },
 ];
@@ -37,11 +38,14 @@ async function main() {
   for (const employee of EMPLOYEES) {
     await prisma.user.upsert({
       where: { employeeNumber: employee.employeeNumber },
-      update: {},
+      // email だけは既存レコードにも反映する（他のフィールドは /settings での
+      // 変更を尊重し、シード再実行では上書きしない）。
+      update: { email: employee.email },
       create: {
         name: employee.name,
         employeeNumber: employee.employeeNumber,
         role: employee.role,
+        email: employee.email,
         passwordHash: initialPasswordHash,
         mustChangePassword: true,
         campusId: defaultCampusId,

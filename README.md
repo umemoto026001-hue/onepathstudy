@@ -88,6 +88,21 @@ npm run dev
 以降、このブランチに新しいコミットを push するたびに Vercel が自動で
 再デプロイします。
 
+## メール通知（任意）
+
+タスクを割り当てたとき／相談・クレームを投稿したとき、担当者にメール通知
+を送れます（[Resend](https://resend.com) を利用）。設定しなくてもアプリ
+自体は問題なく動作します（通知だけスキップされます）。
+
+1. [resend.com](https://resend.com) で無料アカウントを作成し、API キーを発行
+2. Vercel の「Environment Variables」に `RESEND_API_KEY` としてそのキーを追加
+3. 各社員のメールアドレスを `/settings` の編集画面から登録
+4. 再デプロイ（新しいコミットを push するか、Redeploy）
+
+独自ドメイン（例: `onepathstudy.com`）をResendで認証すれば、送信元アドレス
+を `RESEND_FROM_EMAIL` で好きなものに変更できます。未設定の間は
+`onboarding@resend.dev` から送信されます。
+
 ## 役職別アクセス範囲（提案書 3-7）
 
 `lib/permissions.ts` に集約しています。
@@ -117,6 +132,7 @@ npm run dev
 - 相談・クレームに返信スレッド機能は設けず、投稿とステータス変更のみ。
 - 相談・クレームは生徒への任意紐付けが可能（生徒名簿と連携、必須ではない）。
 - 校舎（キャンパス）は最初から複数校舎に対応するデータ構造を用意（`Campus` モデル）。
+- 業務効率化のため、タスク・相談の担当者へのメール通知機能を追加（`User.email`、`lib/email.ts`）。
 
 その他、提案書に記載のない実装判断は `prisma/schema.prisma` 冒頭のコメントに
 まとめています（例: `ClassSession` の追加理由、生徒の在籍ステータス追加など）。

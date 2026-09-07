@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { sendNotificationEmail } from "@/lib/email";
+import { getAppUrl } from "@/lib/appUrl";
 
 const taskSchema = z.object({
   title: z.string().min(1, "タイトルを入力してください"),
@@ -31,7 +33,7 @@ export async function createTask(
   }
   const data = result.data;
 
-  await prisma.task.create({
+  const task = await prisma.task.create({
     data: {
       title: data.title,
       description: data.description || null,
@@ -39,6 +41,13 @@ export async function createTask(
       creatorId: session.user.id,
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
     },
+    include: { assignee: true, creator: true },
+  });
+
+  await sendNotificationEmail({
+    to: task.assignee.email,
+    subject: `【One Path Study】新しいタスク: ${task.title}`,
+    text: `${task.creator.name}さんからタスクが割り当てられました。\n\nタイトル: ${task.title}\n${task.description ? `内容: ${task.description}\n` : ""}\n${await getAppUrl("/tasks")}`,
   });
 
   revalidatePath("/tasks");

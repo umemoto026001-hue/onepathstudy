@@ -106,6 +106,7 @@ export default async function SettingsPage({
                   </div>
                   <p className="text-sm text-foreground/60">
                     社員番号: {user.employeeNumber} ・ {user.campus?.name ?? "校舎未設定"}
+                    {user.email ? ` ・ ${user.email}` : " ・ 通知メール未設定"}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">

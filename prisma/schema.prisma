@@ -11,6 +11,8 @@
 // - Consultation に返信スレッドは設けず、投稿+ステータス変更のみとした（ユーザー確認済み）。
 // - Consultation.studentId は任意の生徒紐付けとした（ユーザー確認済み）。
 // - Campus（校舎）は複数校舎対応の構造として最初から用意した（ユーザー確認済み）。
+// - User.email（任意）: 提案書のログインIDは社員番号のみだが、タスク・相談の
+//   メール通知機能のために追加した。未設定のユーザーには通知メールを送らない。
 
 generator client {
   provider = "prisma-client-js"
@@ -82,6 +84,7 @@ model User {
   id                 String   @id @default(cuid())
   employeeNumber     String   @unique
   name               String
+  email              String?
   passwordHash       String
   role               Role
   campusId           String?

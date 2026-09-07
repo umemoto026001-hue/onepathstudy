@@ -44,6 +44,9 @@ export default function UserForm({
         <Field label="社員番号" htmlFor="employeeNumber" required hint="ログインIDとして使用します">
           <Input id="employeeNumber" name="employeeNumber" required defaultValue={user?.employeeNumber} />
         </Field>
+        <Field label="メールアドレス" htmlFor="email" hint="タスク・相談の通知メール送信先（任意）">
+          <Input id="email" name="email" type="email" defaultValue={user?.email ?? ""} />
+        </Field>
         <Field label="役職" htmlFor="role" required>
           <Select id="role" name="role" required defaultValue={user?.role ?? "TEACHER"}>
             {Object.entries(ROLE_LABEL).map(([value, label]) => (
