@@ -23,17 +23,18 @@ export default function LoginForm() {
   return (
     <form action={formAction} className="space-y-4">
       <div>
-        <label htmlFor="email" className="mb-1 block text-sm font-medium text-navy">
-          メールアドレス
+        <label htmlFor="employeeNumber" className="mb-1 block text-sm font-medium text-navy">
+          社員番号
         </label>
         <input
-          id="email"
-          name="email"
-          type="email"
+          id="employeeNumber"
+          name="employeeNumber"
+          type="text"
           required
-          autoComplete="email"
+          autoComplete="username"
+          inputMode="numeric"
           className="w-full rounded-lg border border-navy/20 bg-white px-4 py-2.5 text-foreground focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/30"
-          placeholder="you@onepathstudy.com"
+          placeholder="例: 026001"
         />
       </div>
       <div>

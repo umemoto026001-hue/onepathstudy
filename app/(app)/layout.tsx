@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { logout } from "@/app/actions/auth";
-import NavBar from "@/components/NavBar";
+import NavBar, { type NavItem } from "@/components/NavBar";
+import { canManageSettings, canViewStudentRoster, ROLE_LABEL } from "@/lib/permissions";
 
 export default async function AppLayout({
   children,
@@ -12,6 +13,22 @@ export default async function AppLayout({
   if (!session?.user) {
     redirect("/");
   }
+  if (session.user.mustChangePassword) {
+    redirect("/change-password");
+  }
+
+  const role = session.user.role as "TEACHER" | "STAFF" | "HQ" | "EXECUTIVE";
+
+  const navItems: NavItem[] = [
+    { href: "/dashboard", label: "ダッシュボード" },
+    { href: "/tasks", label: "タスク・相談" },
+    ...(canViewStudentRoster(role) ? [{ href: "/students", label: "生徒名簿" }] : []),
+    { href: "/classes", label: "クラス" },
+    { href: "/attendance", label: "出欠" },
+    { href: "/submissions", label: "演習提出" },
+    { href: "/interviews", label: "面談記録" },
+    ...(canManageSettings(role) ? [{ href: "/settings", label: "設定" }] : []),
+  ];
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -23,7 +40,7 @@ export default async function AppLayout({
             </span>
             <div className="flex items-center gap-3 text-sm">
               <span className="hidden text-white/80 sm:inline">
-                {session.user.name} さん
+                {session.user.name}（{ROLE_LABEL[role]}）
               </span>
               <form action={logout}>
                 <button
@@ -35,7 +52,7 @@ export default async function AppLayout({
               </form>
             </div>
           </div>
-          <NavBar />
+          <NavBar items={navItems} />
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">

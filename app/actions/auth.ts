@@ -9,7 +9,7 @@ export async function authenticate(
 ) {
   try {
     await signIn("credentials", {
-      email: formData.get("email"),
+      employeeNumber: formData.get("employeeNumber"),
       password: formData.get("password"),
       redirectTo: "/dashboard",
     });
@@ -17,7 +17,7 @@ export async function authenticate(
     if (error instanceof AuthError) {
       switch (error.type) {
         case "CredentialsSignin":
-          return "メールアドレスまたはパスワードが正しくありません。";
+          return "社員番号またはパスワードが正しくありません。";
         default:
           return "ログインに失敗しました。時間をおいて再度お試しください。";
       }
