@@ -12,7 +12,13 @@ export default function DeleteUserButton({ id, name }: { id: string; name: strin
       disabled={pending}
       onClick={() => {
         if (confirm(`「${name}」さんのアカウントを削除します。よろしいですか？`)) {
-          startTransition(() => deleteUser(id));
+          startTransition(async () => {
+            try {
+              await deleteUser(id);
+            } catch (error) {
+              alert(error instanceof Error ? error.message : "削除に失敗しました。");
+            }
+          });
         }
       }}
       className="text-sm text-coral underline disabled:opacity-50"

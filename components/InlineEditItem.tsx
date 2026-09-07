@@ -67,7 +67,13 @@ export default function InlineEditItem({
           disabled={pending}
           onClick={() => {
             if (confirm(deleteConfirmMessage)) {
-              startTransition(() => onDelete(id));
+              startTransition(async () => {
+                try {
+                  await onDelete(id);
+                } catch (error) {
+                  alert(error instanceof Error ? error.message : "削除に失敗しました。");
+                }
+              });
             }
           }}
           className="text-sm text-coral underline"

@@ -2,9 +2,16 @@
 
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+
+function isForeignKeyError(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003"
+  );
+}
 
 // --- Subject master ---
 
@@ -26,7 +33,16 @@ export async function updateSubject(id: string, name: string) {
 }
 
 export async function deleteSubject(id: string) {
-  await prisma.subject.delete({ where: { id } });
+  try {
+    await prisma.subject.delete({ where: { id } });
+  } catch (error) {
+    if (isForeignKeyError(error)) {
+      throw new Error(
+        "この科目は生徒・スケジュール・演習問題・進捗記録のいずれかで使用されているため削除できません。",
+      );
+    }
+    throw error;
+  }
   revalidatePath("/settings");
 }
 
@@ -143,6 +159,15 @@ export async function updateUser(
 }
 
 export async function deleteUser(id: string) {
-  await prisma.user.delete({ where: { id } });
+  try {
+    await prisma.user.delete({ where: { id } });
+  } catch (error) {
+    if (isForeignKeyError(error)) {
+      throw new Error(
+        "このアカウントは授業スケジュール・演習問題・進捗記録のいずれかに紐づいているため削除できません。",
+      );
+    }
+    throw error;
+  }
   revalidatePath("/settings");
 }
