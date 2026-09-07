@@ -1,4 +1,42 @@
-import type { ConsultationStatus, StudentStatus, TaskStatus } from "@prisma/client";
+import type {
+  AttendanceStatus,
+  ClassMode,
+  ConsultationStatus,
+  StudentStatus,
+  TaskStatus,
+  Weekday,
+} from "@prisma/client";
+
+export const WEEKDAY_LABEL: Record<Weekday, string> = {
+  MON: "月",
+  TUE: "火",
+  WED: "水",
+  THU: "木",
+  FRI: "金",
+  SAT: "土",
+  SUN: "日",
+};
+
+export const WEEKDAY_ORDER: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+export const CLASS_MODE_LABEL: Record<ClassMode, string> = {
+  ONLINE: "オンライン",
+  OFFLINE: "対面",
+};
+
+export const ATTENDANCE_STATUS_LABEL: Record<AttendanceStatus, string> = {
+  PRESENT: "出席",
+  ABSENT: "欠席",
+  LATE: "遅刻",
+  EXCUSED: "公欠",
+};
+
+export const ATTENDANCE_STATUS_BADGE: Record<AttendanceStatus, "navy" | "coral" | "gold" | "gray" | "green"> = {
+  PRESENT: "green",
+  ABSENT: "coral",
+  LATE: "gold",
+  EXCUSED: "gray",
+};
 
 export const STUDENT_STATUS_LABEL: Record<StudentStatus, string> = {
   ENROLLED: "在籍中",
