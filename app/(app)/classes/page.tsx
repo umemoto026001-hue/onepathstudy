@@ -3,19 +3,14 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Badge, Card, LinkButton, PageHeader } from "@/components/ui";
 import { CLASS_MODE_LABEL, WEEKDAY_LABEL, WEEKDAY_ORDER } from "@/lib/labels";
-import { canManageClasses, canViewAll, isClassScoped } from "@/lib/permissions";
-import type { Prisma } from "@prisma/client";
+import { canManageClasses } from "@/lib/permissions";
+import { classAccessWhere } from "@/lib/classAccess";
 
 export default async function ClassesPage() {
   const session = await auth();
   const role = session!.user.role as "TEACHER" | "STAFF" | "HQ" | "EXECUTIVE";
 
-  const where: Prisma.ClassWhereInput = {};
-  if (isClassScoped(role)) {
-    where.teacherId = session!.user.id;
-  } else if (!canViewAll(role)) {
-    where.OR = [{ campusId: session!.user.campusId }, { campusId: null }];
-  }
+  const where = classAccessWhere(role, session!.user.id, session!.user.campusId);
 
   const classes = await prisma.class.findMany({
     where,

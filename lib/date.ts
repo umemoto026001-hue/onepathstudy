@@ -20,3 +20,7 @@ export function formatDayShort(date: Date | string) {
 export function formatMonthLabel(date: Date | string) {
   return format(new Date(date), "yyyy年M月", { locale: ja });
 }
+
+export function toDateParam(date: Date) {
+  return format(date, "yyyy-MM-dd");
+}
