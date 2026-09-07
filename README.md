@@ -8,18 +8,27 @@
 ## 技術スタック
 
 - Next.js (App Router / TypeScript) + Tailwind CSS v4
-- Prisma ORM + SQLite（`prisma/dev.db`。将来的に PostgreSQL 等へ移行しやすい構成）
+- Prisma ORM + PostgreSQL
 - NextAuth (Auth.js) v5 Credentials Provider による社員番号＋パスワード認証
 
-## セットアップ
+## セットアップ（ローカル開発）
+
+Postgres が必要です。ローカルに無ければ Docker で立てるのが手軽です。
 
 ```bash
+docker run -d -p 5432:5432 \
+  -e POSTGRES_USER=app -e POSTGRES_PASSWORD=app -e POSTGRES_DB=onepathstudy \
+  postgres:16
+
 npm install
 cp .env.example .env   # NEXTAUTH_SECRET を発行して設定してください
 npx prisma migrate dev # DBマイグレーションを適用
-npm run db:seed        # 科目マスタ・校舎マスタと初期社員アカウントを投入
 npm run dev
 ```
+
+（`npm run dev` はシードを自動実行しません。初回だけ `npm run db:seed` を
+実行してください。`npm run build` はマイグレーション適用とシードを自動で
+行います＝本番デプロイ時に手動操作は不要です。）
 
 `http://localhost:3000` を開き、以下のシードアカウント（社員番号でログイン）
 で入れます。初期パスワードは全員共通で `onepath` で、初回ログイン時に
@@ -53,15 +62,31 @@ npm run dev
 ドメインが変わる環境でもそのまま動作します。固定ドメインに限定したい場合の
 み `NEXTAUTH_URL` を設定してください。
 
-## デプロイに関する注意
+## Vercel へのデプロイ手順
 
-- 想定ホスティングは Vercel です。SQLite をそのまま使う場合、Vercel の
-  サーバーレス環境はファイルシステムが実行間で永続化されないため、
-  本番運用では Turso 等の SQLite 互換サービス、または `DATABASE_URL` を
-  変更して PostgreSQL 等へ切り替えることを推奨します（Prisma のスキーマは
-  移行しやすいよう標準的な型で設計しています）。
-- 本番デプロイ時は `npx prisma migrate deploy` でマイグレーションを適用し、
-  初回のみ `npm run db:seed` を実行してください。
+1. [vercel.com](https://vercel.com) にアクセスし、GitHub アカウントでログイン。
+2. 「Add New...」→「Project」→ この `onepathstudy` リポジトリを Import。
+   （リポジトリはブランチが1本のみなので、そのままで問題ありません）
+3. データベースを用意する：プロジェクト作成画面または作成後の
+   「Storage」タブから「Create Database」→ Postgres を選択して接続
+   （Neon 等のマーケットプレイス経由になる場合があります。名前は何でも
+   構いません）。作成すると接続文字列が発行されます。
+4. 「Settings」→「Environment Variables」で以下を設定：
+   - `DATABASE_URL`：手順3で発行された接続文字列をそのまま貼り付け
+     （Vercel の Postgres 連携が `POSTGRES_URL` 等の別名で変数を追加する
+     場合は、値をコピーして `DATABASE_URL` という名前で追加してください）
+   - `NEXTAUTH_SECRET`：ランダムな文字列（下記コマンドで生成できます）
+     ```bash
+     node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+     ```
+5. 「Deploy」を押す。ビルド時に `npm run build` が自動実行され、
+   マイグレーション適用・初期社員アカウント投入まで自動で完了します。
+6. デプロイ完了後に発行される URL（例: `onepathstudy.vercel.app`）を
+   梅本さん・木村さん・宮坂さんで共有してください。社員番号（026001/
+   026002/026003）と初期パスワード「onepath」でログインできます。
+
+以降、このブランチに新しいコミットを push するたびに Vercel が自動で
+再デプロイします。
 
 ## 役職別アクセス範囲（提案書 3-7）
 
