@@ -26,7 +26,7 @@ export default async function AppLayout({
     { href: "/classes", label: "クラス" },
     { href: "/attendance", label: "出欠" },
     { href: "/submissions", label: "演習提出" },
-    { href: "/interviews", label: "面談記録" },
+    ...(canViewStudentRoster(role) ? [{ href: "/interviews", label: "面談記録" }] : []),
     ...(canManageSettings(role) ? [{ href: "/settings", label: "設定" }] : []),
   ];
 
