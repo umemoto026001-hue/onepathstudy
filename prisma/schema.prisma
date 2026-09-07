@@ -1,0 +1,189 @@
+// One Path Study 基幹管理アプリ - Prisma schema
+// DB: SQLite (将来的に PostgreSQL へ移行しやすいよう、型はできるだけ標準的なものを使用)
+//
+// 実装メモ:
+// - 設計書では ProgressLog.relatedProblemIds は String[] (配列) と指定されているが、
+//   SQLite コネクタは scalar list をサポートしないため、Problem <-> ProgressLog の
+//   暗黙的な多対多リレーション (relatedProblems) として実装している。
+//   意味的には同じ「進捗記録に紐づく演習問題の集合」を表す。
+// - University (対象大学) は Student.targetUniversity / Problem.university が
+//   自由入力である一方、設定画面 (5.7) からマスタとしてリストを編集できるようにするため、
+//   マスタテーブルとして用意した。フォーム側は自由入力 + マスタ候補の併用とする。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN // 管理者
+  TEACHER // 講師
+}
+
+enum Grade {
+  G1 // 高1
+  G2 // 高2
+  G3 // 高3
+  GRADUATE // 既卒
+}
+
+enum StudentStatus {
+  CONSIDERING // 検討中
+  TRIAL // 体験中
+  ENROLLED // 在籍中
+  ON_LEAVE // 休会
+  WITHDRAWN // 退会
+}
+
+enum ScheduleStatus {
+  SCHEDULED // 予定
+  COMPLETED // 実施済み
+  ABSENT // 欠席
+  RESCHEDULED // 振替
+}
+
+enum Difficulty {
+  BASIC // 基礎
+  STANDARD // 標準
+  FAIRLY_HARD // やや難
+  HARD // 難
+}
+
+enum UnderstandingLevel {
+  GOOD // 順調
+  NEEDS_REVIEW // 要復習
+  CONCERNING // 要注意
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(ADMIN)
+  subjects     Subject[] @relation("UserSubjects")
+
+  schedules     ClassSchedule[] @relation("TeacherSchedules")
+  progressLogs  ProgressLog[]   @relation("TeacherProgressLogs")
+  problems      Problem[]       @relation("CreatedByUser")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Subject {
+  id   String @id @default(cuid())
+  name String @unique
+
+  users         User[]          @relation("UserSubjects")
+  students      Student[]       @relation("StudentSubjects")
+  schedules     ClassSchedule[]
+  problems      Problem[]
+  progressLogs  ProgressLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model University {
+  id   String @id @default(cuid())
+  name String @unique
+
+  createdAt DateTime @default(now())
+}
+
+model Student {
+  id                String        @id @default(cuid())
+  name              String
+  grade             Grade
+  targetUniversity  String?
+  targetFaculty     String?
+  subjects          Subject[]     @relation("StudentSubjects")
+  parentName        String?
+  parentContact     String?
+  studentContact    String?
+  enrolledAt        DateTime?
+  status            StudentStatus @default(CONSIDERING)
+  memo              String?
+
+  schedules    ClassSchedule[]
+  progressLogs ProgressLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ClassSchedule {
+  id              String         @id @default(cuid())
+  studentId       String
+  student         Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId       String
+  subject         Subject        @relation(fields: [subjectId], references: [id])
+  teacherId       String
+  teacher         User           @relation("TeacherSchedules", fields: [teacherId], references: [id])
+  startAt         DateTime
+  endAt           DateTime
+  isRecurring     Boolean        @default(false)
+  recurrenceRule  String?
+  meetingUrl      String?
+  status          ScheduleStatus @default(SCHEDULED)
+  note            String?
+
+  progressLogs ProgressLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([startAt])
+  @@index([studentId])
+}
+
+model Problem {
+  id          String      @id @default(cuid())
+  title       String
+  subjectId   String
+  subject     Subject     @relation(fields: [subjectId], references: [id])
+  createdById String
+  createdBy   User        @relation("CreatedByUser", fields: [createdById], references: [id])
+  university  String?
+  unit        String
+  problemText String
+  houshin     String?
+  kaitou      String?
+  kaisetsu    String?
+  difficulty  Difficulty?
+
+  relatedInProgressLogs ProgressLog[] @relation("ProgressLogProblems")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([subjectId])
+}
+
+model ProgressLog {
+  id                 String              @id @default(cuid())
+  studentId          String
+  student            Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId          String
+  subject            Subject             @relation(fields: [subjectId], references: [id])
+  teacherId          String
+  teacher            User                @relation("TeacherProgressLogs", fields: [teacherId], references: [id])
+  date               DateTime
+  relatedScheduleId  String?
+  relatedSchedule    ClassSchedule?      @relation(fields: [relatedScheduleId], references: [id])
+  coveredContent     String
+  relatedProblems    Problem[]           @relation("ProgressLogProblems")
+  understandingLevel UnderstandingLevel?
+  homework           String?
+  note               String?
+
+  createdAt DateTime @default(now())
+
+  @@index([studentId])
+  @@index([date])
+}
