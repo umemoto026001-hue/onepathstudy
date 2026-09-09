@@ -25,7 +25,8 @@ export default async function DashboardPage() {
 
   const [myTasks, myConsultations, todaysClasses, enrolledCount, recentInterviews] = await Promise.all([
     prisma.task.findMany({
-      where: seeAll ? { status: { not: "DONE" } } : { assigneeId: userId, status: { not: "DONE" } },
+      // 個人宛タスクは依頼人・担当者以外には表示しない（役員・本部社員も例外なし）。
+      where: { OR: [{ assigneeId: userId }, { creatorId: userId }], status: { not: "DONE" } },
       include: { assignee: true, creator: true },
       orderBy: { createdAt: "desc" },
       take: 5,

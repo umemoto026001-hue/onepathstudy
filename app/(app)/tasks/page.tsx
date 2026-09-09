@@ -26,12 +26,9 @@ export default async function TasksPage({
   const seeAll = canViewAll(role);
 
   if (activeTab === "tasks") {
-    const where: Prisma.TaskWhereInput = seeAll
-      ? {}
-      : { OR: [{ assigneeId: userId }, { creatorId: userId }] };
-
+    // 個人宛タスクは依頼人・担当者以外には表示しない（役員・本部社員も例外なし）。
     const tasks = await prisma.task.findMany({
-      where,
+      where: { OR: [{ assigneeId: userId }, { creatorId: userId }] },
       include: { assignee: true, creator: true },
       orderBy: [{ createdAt: "desc" }],
     });
