@@ -9,15 +9,13 @@ import {
   TASK_STATUS_LABEL,
   WEEKDAY_LABEL,
 } from "@/lib/labels";
-import { canManageShifts, canViewAll, canViewStudentRoster, ROLE_LABEL } from "@/lib/permissions";
+import { canManageShifts, canViewAll, canViewStudentRoster } from "@/lib/permissions";
 import { classAccessWhere } from "@/lib/classAccess";
 import { formatDate, toDateParam } from "@/lib/date";
-import type { Role, Weekday } from "@prisma/client";
+import DashboardTimetable, { type TimetableRow } from "@/components/DashboardTimetable";
+import type { Weekday } from "@prisma/client";
 
 const WEEKDAY_BY_JS_DAY: Weekday[] = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-
-type TimetableBlock = { label: string; start: string; end: string };
-type TimetableRow = { userId: string; name: string; role: Role; blocks: TimetableBlock[]; start: string };
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -97,10 +95,8 @@ export default async function DashboardPage() {
       name: shift.user.name,
       role: shift.user.role,
       blocks: [],
-      start: shift.startTime,
     };
     row.blocks.push({ label: "出勤", start: shift.startTime, end: shift.endTime });
-    if (shift.startTime < row.start) row.start = shift.startTime;
     timetableRowsByUser.set(shift.userId, row);
   }
   for (const c of todaysClasses) {
@@ -109,15 +105,13 @@ export default async function DashboardPage() {
       name: c.teacher.name,
       role: c.teacher.role,
       blocks: [],
-      start: c.startTime,
     };
     row.blocks.push({ label: `${c.name}（${c.subject.name}）`, start: c.startTime, end: c.endTime });
-    if (c.startTime < row.start) row.start = c.startTime;
     timetableRowsByUser.set(c.teacherId, row);
   }
   const timetableRows = Array.from(timetableRowsByUser.values())
     .map((row) => ({ ...row, blocks: [...row.blocks].sort((a, b) => a.start.localeCompare(b.start)) }))
-    .sort((a, b) => a.start.localeCompare(b.start));
+    .sort((a, b) => a.blocks[0].start.localeCompare(b.blocks[0].start));
 
   const scheduledTasksByAssignee = new Map<string, typeof todaysScheduledTasks>();
   for (const task of todaysScheduledTasks) {
@@ -162,56 +156,14 @@ export default async function DashboardPage() {
             </Link>
           )}
         </div>
-        <div className="space-y-2">
-          {timetableRows.map((row) => {
-            const tasksForRow = scheduledTasksByAssignee.get(row.userId) ?? [];
-            const firstBlock = row.blocks[0];
-            return (
-              <div key={row.userId} className="rounded-lg border border-navy/10 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-navy">{row.name}</span>
-                    <Badge>{ROLE_LABEL[row.role]}</Badge>
-                  </div>
-                  <Link
-                    href={`/tasks/new?assigneeId=${row.userId}&date=${todayParam}&start=${firstBlock.start}&end=${firstBlock.end}`}
-                    className="text-xs text-coral underline"
-                  >
-                    + タスクを貼る
-                  </Link>
-                </div>
-                <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-                  {row.blocks.map((b, i) => (
-                    <li key={i} className="text-xs text-foreground/60">
-                      {b.start}〜{b.end} {b.label}
-                    </li>
-                  ))}
-                </ul>
-                {tasksForRow.length > 0 && (
-                  <ul className="mt-2 flex flex-wrap gap-1.5">
-                    {tasksForRow.map((task) => (
-                      <li key={task.id}>
-                        <Link
-                          href="/tasks"
-                          className="inline-flex items-center gap-1 rounded-full bg-coral/10 px-2.5 py-1 text-xs text-coral"
-                        >
-                          {task.slotStart && task.slotEnd && `${task.slotStart}〜${task.slotEnd} `}
-                          {task.title}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            );
-          })}
-          {timetableRows.length === 0 && (
-            <p className="text-sm text-foreground/50">
-              本日、出勤予定・授業予定の登録はありません。
-              {canManageShifts(role) && "「設定」から社員のシフトを登録できます。"}
-            </p>
-          )}
-        </div>
+        {timetableRows.length > 0 ? (
+          <DashboardTimetable rows={timetableRows} tasksByAssignee={scheduledTasksByAssignee} todayParam={todayParam} />
+        ) : (
+          <p className="text-sm text-foreground/50">
+            本日、出勤予定・授業予定の登録はありません。
+            {canManageShifts(role) && "「設定」から社員のシフトを登録できます。"}
+          </p>
+        )}
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
