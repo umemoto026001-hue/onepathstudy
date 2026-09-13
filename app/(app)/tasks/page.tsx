@@ -10,7 +10,10 @@ import { markTasksRead } from "@/app/actions/tasks";
 import { markConsultationsRead } from "@/app/actions/consultations";
 import TaskStatusSelect from "@/components/TaskStatusSelect";
 import ConsultationStatusSelect from "@/components/ConsultationStatusSelect";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Task, User } from "@prisma/client";
+
+type TaskWithRelations = Task & { assignee: User; creator: User };
+type TabName = "tasks" | "done" | "consultations";
 
 export default async function TasksPage({
   searchParams,
@@ -18,17 +21,20 @@ export default async function TasksPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const { tab } = await searchParams;
-  const activeTab = tab === "consultations" ? "consultations" : "tasks";
+  const activeTab: TabName = tab === "consultations" ? "consultations" : tab === "done" ? "done" : "tasks";
 
   const session = await auth();
   const userId = session!.user.id;
   const role = session!.user.role as "TEACHER" | "STAFF" | "HQ" | "EXECUTIVE";
   const seeAll = canViewAll(role);
 
-  if (activeTab === "tasks") {
+  if (activeTab === "tasks" || activeTab === "done") {
     // 個人宛タスクは依頼人・担当者以外には表示しない（役員・本部社員も例外なし）。
     const tasks = await prisma.task.findMany({
-      where: { OR: [{ assigneeId: userId }, { creatorId: userId }] },
+      where: {
+        OR: [{ assigneeId: userId }, { creatorId: userId }],
+        status: activeTab === "done" ? "DONE" : { not: "DONE" },
+      },
       include: { assignee: true, creator: true },
       orderBy: [{ createdAt: "desc" }],
     });
@@ -46,32 +52,18 @@ export default async function TasksPage({
         />
         <Tabs active={activeTab} />
         <div className="mt-4 space-y-3">
-          {tasks.map((task) => {
-            const isUnread = unreadIds.includes(task.id);
-            return (
-              <Card key={task.id} className={clsx(isUnread && "border-coral/50 bg-coral/5")}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {isUnread && <span className="h-2 w-2 rounded-full bg-coral" aria-label="未読" />}
-                      <span className="font-heading font-bold text-navy">{task.title}</span>
-                      <Badge color={TASK_STATUS_BADGE[task.status]}>{TASK_STATUS_LABEL[task.status]}</Badge>
-                    </div>
-                    <p className="mt-1 text-xs text-foreground/50">
-                      担当: {task.assignee.name} ・ 依頼: {task.creator.name}
-                      {task.dueDate && <> ・ 期限: {formatDate(task.dueDate)}</>}
-                    </p>
-                    {task.description && (
-                      <p className="mt-2 whitespace-pre-wrap text-sm">{task.description}</p>
-                    )}
-                  </div>
-                  <TaskStatusSelect id={task.id} status={task.status} />
-                </div>
-              </Card>
-            );
-          })}
+          {tasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              isUnread={unreadIds.includes(task.id)}
+              canEdit={task.creatorId === userId}
+            />
+          ))}
           {tasks.length === 0 && (
-            <Card className="py-8 text-center text-foreground/50">タスクはありません。</Card>
+            <Card className="py-8 text-center text-foreground/50">
+              {activeTab === "done" ? "完了済みのタスクはありません。" : "タスクはありません。"}
+            </Card>
           )}
         </div>
       </div>
@@ -138,27 +130,67 @@ export default async function TasksPage({
   );
 }
 
-function Tabs({ active }: { active: "tasks" | "consultations" }) {
+function TaskCard({
+  task,
+  isUnread,
+  canEdit,
+}: {
+  task: TaskWithRelations;
+  isUnread: boolean;
+  canEdit: boolean;
+}) {
   return (
-    <div className="flex gap-1 rounded-full bg-navy/5 p-1">
-      <Link
-        href="/tasks?tab=tasks"
-        className={clsx(
-          "rounded-full px-4 py-1.5 text-sm font-medium",
-          active === "tasks" ? "bg-white shadow-sm text-navy" : "text-navy/60",
-        )}
-      >
-        個人宛タスク
-      </Link>
-      <Link
-        href="/tasks?tab=consultations"
-        className={clsx(
-          "rounded-full px-4 py-1.5 text-sm font-medium",
-          active === "consultations" ? "bg-white shadow-sm text-navy" : "text-navy/60",
-        )}
-      >
-        相談・クレーム
-      </Link>
+    <Card className={clsx(isUnread && "border-coral/50 bg-coral/5")}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            {isUnread && <span className="h-2 w-2 rounded-full bg-coral" aria-label="未読" />}
+            <span className="font-heading font-bold text-navy">{task.title}</span>
+            <Badge color={TASK_STATUS_BADGE[task.status]}>{TASK_STATUS_LABEL[task.status]}</Badge>
+          </div>
+          <p className="mt-1 text-xs text-foreground/50">
+            担当: {task.assignee.name} ・ 依頼: {task.creator.name}
+            {task.dueDate && <> ・ 期限: {formatDate(task.dueDate)}</>}
+            {task.scheduledDate && task.slotStart && task.slotEnd && (
+              <>
+                {" "}
+                ・ 配置: {formatDate(task.scheduledDate)} {task.slotStart}〜{task.slotEnd}
+              </>
+            )}
+          </p>
+          {task.description && <p className="mt-2 whitespace-pre-wrap text-sm">{task.description}</p>}
+          {canEdit && (
+            <Link href={`/tasks/${task.id}/edit`} className="mt-2 inline-block text-xs text-navy underline">
+              編集
+            </Link>
+          )}
+        </div>
+        <TaskStatusSelect id={task.id} status={task.status} />
+      </div>
+    </Card>
+  );
+}
+
+function Tabs({ active }: { active: TabName }) {
+  const tabs: { key: TabName; label: string; href: string }[] = [
+    { key: "tasks", label: "個人宛タスク", href: "/tasks?tab=tasks" },
+    { key: "done", label: "完了済み", href: "/tasks?tab=done" },
+    { key: "consultations", label: "相談・クレーム", href: "/tasks?tab=consultations" },
+  ];
+  return (
+    <div className="flex flex-wrap gap-1 rounded-full bg-navy/5 p-1">
+      {tabs.map((t) => (
+        <Link
+          key={t.key}
+          href={t.href}
+          className={clsx(
+            "rounded-full px-4 py-1.5 text-sm font-medium",
+            active === t.key ? "bg-white shadow-sm text-navy" : "text-navy/60",
+          )}
+        >
+          {t.label}
+        </Link>
+      ))}
     </div>
   );
 }

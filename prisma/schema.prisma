@@ -13,6 +13,12 @@
 // - Campus（校舎）は複数校舎対応の構造として最初から用意した（ユーザー確認済み）。
 // - User.email（任意）: 提案書のログインIDは社員番号のみだが、タスク・相談の
 //   メール通知機能のために追加した。未設定のユーザーには通知メールを送らない。
+// - WorkShift（曜日固定の出勤シフト）: 提案書に明記はないが、ダッシュボードの
+//   「本日のタイムテーブル」表示のために追加した（ユーザー確認済み）。日付ごとの
+//   個別変更・休暇申請は扱わず、曜日固定パターンのみを役員が設定する想定。
+// - Task.scheduledDate/slotStart/slotEnd（任意）: タスクをダッシュボードの
+//   当日タイムテーブル上の担当者の時間枠に配置するために追加した（ユーザー確認済み）。
+//   未指定のタスクは従来通りタスク一覧にのみ表示される。
 
 generator client {
   provider = "prisma-client-js"
@@ -92,6 +98,7 @@ model User {
   mustChangePassword Boolean  @default(true)
 
   taughtClasses         Class[]        @relation("TeacherClasses")
+  shifts                WorkShift[]
   assignedTasks         Task[]         @relation("TaskAssignee")
   createdTasks          Task[]         @relation("TaskCreator")
   postedConsultations   Consultation[] @relation("ConsultationPoster")
@@ -233,21 +240,40 @@ model Interview {
 }
 
 model Task {
-  id          String     @id @default(cuid())
-  title       String
-  description String?
-  assigneeId  String
-  assignee    User       @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  creatorId   String
-  creator     User       @relation("TaskCreator", fields: [creatorId], references: [id])
-  status      TaskStatus @default(TODO)
-  dueDate     DateTime?
-  isRead      Boolean    @default(false)
+  id            String     @id @default(cuid())
+  title         String
+  description   String?
+  assigneeId    String
+  assignee      User       @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creatorId     String
+  creator       User       @relation("TaskCreator", fields: [creatorId], references: [id])
+  status        TaskStatus @default(TODO)
+  dueDate       DateTime?
+  // 当日タイムテーブルへの配置用（任意）。指定時のみダッシュボードの担当者の枠に表示される。
+  scheduledDate DateTime?
+  slotStart     String?
+  slotEnd       String?
+  isRead        Boolean    @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([assigneeId])
+  @@index([scheduledDate])
+}
+
+model WorkShift {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekday   Weekday
+  startTime String
+  endTime   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, weekday])
 }
 
 model Consultation {

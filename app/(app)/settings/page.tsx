@@ -113,6 +113,9 @@ export default async function SettingsPage({
                   <Link href={`/settings?editUserId=${user.id}`} className="text-sm text-navy underline">
                     編集
                   </Link>
+                  <Link href={`/settings/shifts/${user.id}`} className="text-sm text-navy underline">
+                    シフト
+                  </Link>
                   <ResetPasswordButton id={user.id} name={user.name} />
                   {session!.user.id !== user.id && <DeleteUserButton id={user.id} name={user.name} />}
                 </div>

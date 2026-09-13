@@ -9,12 +9,15 @@ import {
   TASK_STATUS_LABEL,
   WEEKDAY_LABEL,
 } from "@/lib/labels";
-import { canViewAll, canViewStudentRoster } from "@/lib/permissions";
+import { canManageShifts, canViewAll, canViewStudentRoster, ROLE_LABEL } from "@/lib/permissions";
 import { classAccessWhere } from "@/lib/classAccess";
-import { formatDate } from "@/lib/date";
-import type { Weekday } from "@prisma/client";
+import { formatDate, toDateParam } from "@/lib/date";
+import type { Role, Weekday } from "@prisma/client";
 
 const WEEKDAY_BY_JS_DAY: Weekday[] = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+type TimetableBlock = { label: string; start: string; end: string };
+type TimetableRow = { userId: string; name: string; role: Role; blocks: TimetableBlock[]; start: string };
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -22,8 +25,21 @@ export default async function DashboardPage() {
   const role = session!.user.role as "TEACHER" | "STAFF" | "HQ" | "EXECUTIVE";
   const seeAll = canViewAll(role);
   const todayWeekday = WEEKDAY_BY_JS_DAY[new Date().getDay()];
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfTomorrow = new Date(startOfToday);
+  startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+  const todayParam = toDateParam(startOfToday);
 
-  const [myTasks, myConsultations, todaysClasses, enrolledCount, recentInterviews] = await Promise.all([
+  const [
+    myTasks,
+    myConsultations,
+    todaysClasses,
+    todaysShifts,
+    todaysScheduledTasks,
+    enrolledCount,
+    recentInterviews,
+  ] = await Promise.all([
     prisma.task.findMany({
       // 個人宛タスクは依頼人・担当者以外には表示しない（役員・本部社員も例外なし）。
       where: { OR: [{ assigneeId: userId }, { creatorId: userId }], status: { not: "DONE" } },
@@ -44,6 +60,19 @@ export default async function DashboardPage() {
       include: { subject: true, teacher: true },
       orderBy: { startTime: "asc" },
     }),
+    prisma.workShift.findMany({
+      where: { weekday: todayWeekday },
+      include: { user: true },
+      orderBy: { startTime: "asc" },
+    }),
+    prisma.task.findMany({
+      // タイムテーブルに貼られたタスクも、依頼人・担当者以外には見せない。
+      where: {
+        OR: [{ assigneeId: userId }, { creatorId: userId }],
+        scheduledDate: { gte: startOfToday, lt: startOfTomorrow },
+      },
+      orderBy: { slotStart: "asc" },
+    }),
     canViewStudentRoster(role)
       ? prisma.student.count({
           where: seeAll
@@ -60,6 +89,42 @@ export default async function DashboardPage() {
         })
       : Promise.resolve([]),
   ]);
+
+  const timetableRowsByUser = new Map<string, TimetableRow>();
+  for (const shift of todaysShifts) {
+    const row = timetableRowsByUser.get(shift.userId) ?? {
+      userId: shift.userId,
+      name: shift.user.name,
+      role: shift.user.role,
+      blocks: [],
+      start: shift.startTime,
+    };
+    row.blocks.push({ label: "出勤", start: shift.startTime, end: shift.endTime });
+    if (shift.startTime < row.start) row.start = shift.startTime;
+    timetableRowsByUser.set(shift.userId, row);
+  }
+  for (const c of todaysClasses) {
+    const row = timetableRowsByUser.get(c.teacherId) ?? {
+      userId: c.teacherId,
+      name: c.teacher.name,
+      role: c.teacher.role,
+      blocks: [],
+      start: c.startTime,
+    };
+    row.blocks.push({ label: `${c.name}（${c.subject.name}）`, start: c.startTime, end: c.endTime });
+    if (c.startTime < row.start) row.start = c.startTime;
+    timetableRowsByUser.set(c.teacherId, row);
+  }
+  const timetableRows = Array.from(timetableRowsByUser.values())
+    .map((row) => ({ ...row, blocks: [...row.blocks].sort((a, b) => a.start.localeCompare(b.start)) }))
+    .sort((a, b) => a.start.localeCompare(b.start));
+
+  const scheduledTasksByAssignee = new Map<string, typeof todaysScheduledTasks>();
+  for (const task of todaysScheduledTasks) {
+    const list = scheduledTasksByAssignee.get(task.assigneeId) ?? [];
+    list.push(task);
+    scheduledTasksByAssignee.set(task.assigneeId, list);
+  }
 
   return (
     <div className="space-y-6">
@@ -86,36 +151,70 @@ export default async function DashboardPage() {
         {enrolledCount !== null && <SummaryCard label="在籍中の生徒" value={enrolledCount} color="green" />}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-heading text-lg font-bold text-navy">
-              本日（{WEEKDAY_LABEL[todayWeekday]}曜日）のクラス
-            </h2>
-            <Link href="/classes" className="text-sm text-coral underline">
-              クラス一覧を見る
+      <Card>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-heading text-lg font-bold text-navy">
+            本日（{WEEKDAY_LABEL[todayWeekday]}曜日）のタイムテーブル
+          </h2>
+          {canManageShifts(role) && (
+            <Link href="/settings" className="text-sm text-coral underline">
+              シフトを設定する
             </Link>
-          </div>
-          <ul className="space-y-2">
-            {todaysClasses.map((c) => (
-              <li key={c.id}>
-                <Link
-                  href={`/classes/${c.id}`}
-                  className="flex flex-wrap items-center gap-2 rounded-lg bg-navy/5 px-3 py-2 text-sm hover:bg-navy/10"
-                >
-                  <span className="font-medium text-navy">{c.startTime}〜{c.endTime}</span>
-                  <span>{c.name}</span>
-                  <Badge>{c.subject.name}</Badge>
-                  <span className="text-xs text-foreground/50">担当: {c.teacher.name}</span>
-                </Link>
-              </li>
-            ))}
-            {todaysClasses.length === 0 && (
-              <p className="text-sm text-foreground/50">本日のクラスはありません。</p>
-            )}
-          </ul>
-        </Card>
+          )}
+        </div>
+        <div className="space-y-2">
+          {timetableRows.map((row) => {
+            const tasksForRow = scheduledTasksByAssignee.get(row.userId) ?? [];
+            const firstBlock = row.blocks[0];
+            return (
+              <div key={row.userId} className="rounded-lg border border-navy/10 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-navy">{row.name}</span>
+                    <Badge>{ROLE_LABEL[row.role]}</Badge>
+                  </div>
+                  <Link
+                    href={`/tasks/new?assigneeId=${row.userId}&date=${todayParam}&start=${firstBlock.start}&end=${firstBlock.end}`}
+                    className="text-xs text-coral underline"
+                  >
+                    + タスクを貼る
+                  </Link>
+                </div>
+                <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+                  {row.blocks.map((b, i) => (
+                    <li key={i} className="text-xs text-foreground/60">
+                      {b.start}〜{b.end} {b.label}
+                    </li>
+                  ))}
+                </ul>
+                {tasksForRow.length > 0 && (
+                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                    {tasksForRow.map((task) => (
+                      <li key={task.id}>
+                        <Link
+                          href="/tasks"
+                          className="inline-flex items-center gap-1 rounded-full bg-coral/10 px-2.5 py-1 text-xs text-coral"
+                        >
+                          {task.slotStart && task.slotEnd && `${task.slotStart}〜${task.slotEnd} `}
+                          {task.title}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+          {timetableRows.length === 0 && (
+            <p className="text-sm text-foreground/50">
+              本日、出勤予定・授業予定の登録はありません。
+              {canManageShifts(role) && "「設定」から社員のシフトを登録できます。"}
+            </p>
+          )}
+        </div>
+      </Card>
 
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-heading text-lg font-bold text-navy">未対応タスク</h2>
@@ -139,9 +238,7 @@ export default async function DashboardPage() {
             {myTasks.length === 0 && <p className="text-sm text-foreground/50">未対応のタスクはありません。</p>}
           </ul>
         </Card>
-      </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-heading text-lg font-bold text-navy">未対応の相談・クレーム</h2>
@@ -168,7 +265,9 @@ export default async function DashboardPage() {
             )}
           </ul>
         </Card>
+      </div>
 
+      <div className="grid gap-6 lg:grid-cols-2">
         {canViewStudentRoster(role) && (
           <Card>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

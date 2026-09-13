@@ -47,3 +47,13 @@ export function canManageSettings(role: Role) {
 export function canManageConsultationStatus(role: Role, isAssignee: boolean) {
   return isAssignee || role === "EXECUTIVE";
 }
+
+/** 社員の出勤シフト（曜日固定）を編集できるか */
+export function canManageShifts(role: Role) {
+  return role === "EXECUTIVE";
+}
+
+/** タスクの編集ができるか（依頼人本人のみ） */
+export function canEditTask(isCreator: boolean) {
+  return isCreator;
+}
