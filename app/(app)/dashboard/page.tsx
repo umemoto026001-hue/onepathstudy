@@ -139,12 +139,6 @@ export default async function DashboardPage() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <SummaryCard label="未対応タスク" value={myTasks.length} color="coral" />
-        <SummaryCard label="未対応の相談・クレーム" value={myConsultations.length} color="gold" />
-        {enrolledCount !== null && <SummaryCard label="在籍中の生徒" value={enrolledCount} color="green" />}
-      </div>
-
       <Card>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-heading text-lg font-bold text-navy">
@@ -166,86 +160,76 @@ export default async function DashboardPage() {
         )}
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-heading text-lg font-bold text-navy">未対応タスク</h2>
-            <Link href="/tasks" className="text-sm text-coral underline">
-              タスク一覧を見る
-            </Link>
-          </div>
-          <ul className="space-y-2">
-            {myTasks.map((task) => (
-              <li key={task.id} className="rounded-lg bg-navy/5 px-3 py-2 text-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-navy">{task.title}</span>
-                  <Badge color={TASK_STATUS_BADGE[task.status]}>{TASK_STATUS_LABEL[task.status]}</Badge>
-                </div>
-                <p className="text-xs text-foreground/50">
-                  担当: {task.assignee.name} ・ 依頼: {task.creator.name}
-                  {task.dueDate && <> ・ 期限: {formatDate(task.dueDate)}</>}
-                </p>
-              </li>
-            ))}
-            {myTasks.length === 0 && <p className="text-sm text-foreground/50">未対応のタスクはありません。</p>}
-          </ul>
-        </Card>
-
-        <Card>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-heading text-lg font-bold text-navy">未対応の相談・クレーム</h2>
-            <Link href="/tasks?tab=consultations" className="text-sm text-coral underline">
-              相談一覧を見る
-            </Link>
-          </div>
-          <ul className="space-y-2">
-            {myConsultations.map((c) => (
-              <li key={c.id} className="rounded-lg bg-navy/5 px-3 py-2 text-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-navy">{c.title}</span>
-                  <Badge color={CONSULTATION_STATUS_BADGE[c.status]}>
-                    {CONSULTATION_STATUS_LABEL[c.status]}
-                  </Badge>
-                </div>
-                <p className="text-xs text-foreground/50">
-                  投稿: {c.poster.name} ・ 担当: {c.assignee.name}
-                </p>
-              </li>
-            ))}
-            {myConsultations.length === 0 && (
-              <p className="text-sm text-foreground/50">未対応の相談・クレームはありません。</p>
-            )}
-          </ul>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <SummaryCard label="未対応タスク" value={myTasks.length} color="coral" />
+        <SummaryCard label="未対応の相談・クレーム" value={myConsultations.length} color="gold" />
+        {enrolledCount !== null && <SummaryCard label="在籍中の生徒" value={enrolledCount} color="green" />}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
+        <MiniListCard title="未対応タスク" href="/tasks" linkLabel="一覧">
+          {myTasks.slice(0, 3).map((task) => (
+            <li key={task.id} className="flex items-center justify-between gap-2 rounded-md bg-navy/5 px-2.5 py-1.5">
+              <span className="truncate text-navy">{task.title}</span>
+              <Badge color={TASK_STATUS_BADGE[task.status]}>{TASK_STATUS_LABEL[task.status]}</Badge>
+            </li>
+          ))}
+          {myTasks.length === 0 && <EmptyLine>未対応のタスクはありません。</EmptyLine>}
+        </MiniListCard>
+
+        <MiniListCard title="未対応の相談・クレーム" href="/tasks?tab=consultations" linkLabel="一覧">
+          {myConsultations.slice(0, 3).map((c) => (
+            <li key={c.id} className="flex items-center justify-between gap-2 rounded-md bg-navy/5 px-2.5 py-1.5">
+              <span className="truncate text-navy">{c.title}</span>
+              <Badge color={CONSULTATION_STATUS_BADGE[c.status]}>{CONSULTATION_STATUS_LABEL[c.status]}</Badge>
+            </li>
+          ))}
+          {myConsultations.length === 0 && <EmptyLine>未対応の相談・クレームはありません。</EmptyLine>}
+        </MiniListCard>
+
         {canViewStudentRoster(role) && (
-          <Card>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-heading text-lg font-bold text-navy">直近の面談記録</h2>
-              <Link href="/interviews" className="text-sm text-coral underline">
-                面談記録一覧を見る
-              </Link>
-            </div>
-            <ul className="space-y-2">
-              {recentInterviews.map((interview) => (
-                <li key={interview.id} className="rounded-lg bg-navy/5 px-3 py-2 text-sm">
-                  <span className="font-medium text-navy">{formatDate(interview.date)}</span>{" "}
-                  <Link href={`/students/${interview.studentId}`} className="underline">
-                    {interview.student.name}
-                  </Link>
-                </li>
-              ))}
-              {recentInterviews.length === 0 && (
-                <p className="text-sm text-foreground/50">面談記録はまだありません。</p>
-              )}
-            </ul>
-          </Card>
+          <MiniListCard title="直近の面談記録" href="/interviews" linkLabel="一覧">
+            {recentInterviews.slice(0, 3).map((interview) => (
+              <li key={interview.id} className="rounded-md bg-navy/5 px-2.5 py-1.5 text-navy">
+                <Link href={`/students/${interview.studentId}`} className="hover:underline">
+                  {formatDate(interview.date)} {interview.student.name}
+                </Link>
+              </li>
+            ))}
+            {recentInterviews.length === 0 && <EmptyLine>面談記録はまだありません。</EmptyLine>}
+          </MiniListCard>
         )}
       </div>
     </div>
   );
+}
+
+function MiniListCard({
+  title,
+  href,
+  linkLabel,
+  children,
+}: {
+  title: string;
+  href: string;
+  linkLabel: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="p-4">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-navy">{title}</h2>
+        <Link href={href} className="text-xs text-coral underline">
+          {linkLabel}
+        </Link>
+      </div>
+      <ul className="space-y-1.5 text-xs">{children}</ul>
+    </Card>
+  );
+}
+
+function EmptyLine({ children }: { children: React.ReactNode }) {
+  return <p className="text-foreground/50">{children}</p>;
 }
 
 function SummaryCard({

@@ -101,8 +101,11 @@ export default function DashboardTimetable({
                   {row.blocks.map((b, i) => (
                     <div
                       key={i}
-                      className="absolute top-0 flex h-5 items-center overflow-hidden rounded bg-navy/15 px-1.5 text-[11px] font-medium whitespace-nowrap text-navy"
-                      style={{ left: leftPx(toMinutes(b.start)), width: widthPx(toMinutes(b.start), toMinutes(b.end)) }}
+                      className="absolute top-0 z-[1] flex h-5 items-center whitespace-nowrap rounded bg-navy/15 px-1.5 text-[11px] font-medium text-navy"
+                      style={{
+                        left: leftPx(toMinutes(b.start)),
+                        minWidth: widthPx(toMinutes(b.start), toMinutes(b.end)),
+                      }}
                       title={`${b.start}〜${b.end} ${b.label}`}
                     >
                       {b.label}
@@ -112,10 +115,10 @@ export default function DashboardTimetable({
                     <Link
                       key={t.id}
                       href="/tasks"
-                      className="absolute top-6 flex h-5 items-center overflow-hidden rounded bg-coral/20 px-1.5 text-[11px] font-medium whitespace-nowrap text-coral hover:bg-coral/30"
+                      className="absolute top-6 z-[1] flex h-5 items-center whitespace-nowrap rounded bg-coral/20 px-1.5 text-[11px] font-medium text-coral hover:z-[2] hover:bg-coral/30"
                       style={{
                         left: leftPx(toMinutes(t.slotStart!)),
-                        width: widthPx(toMinutes(t.slotStart!), toMinutes(t.slotEnd!)),
+                        minWidth: widthPx(toMinutes(t.slotStart!), toMinutes(t.slotEnd!)),
                       }}
                       title={`${t.slotStart}〜${t.slotEnd} ${t.title}`}
                     >
