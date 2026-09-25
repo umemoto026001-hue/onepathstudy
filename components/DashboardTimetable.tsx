@@ -19,15 +19,48 @@ export type ScheduledTask = { id: string; title: string; slotStart: string | nul
 const PX_PER_HOUR = 110;
 const NAME_COL_WIDTH = 190;
 const MIN_BLOCK_WIDTH = 40;
+const BLOCK_HEIGHT = 28;
+const TIER_HEIGHT = 34;
 
 const KIND_CLASS: Record<string, string> = {
   calendar: "bg-emerald-500/15 text-emerald-700",
   schedule: "bg-violet-500/15 text-violet-700",
+  task: "bg-coral/20 text-coral hover:bg-coral/30",
 };
 
 function toMinutes(hhmm: string) {
   const [h, m] = hhmm.split(":").map(Number);
   return h * 60 + m;
+}
+
+type TimelineItem = {
+  key: string;
+  label: string;
+  start: string;
+  end: string;
+  startMin: number;
+  endMin: number;
+  kind: "shift" | "class" | "calendar" | "schedule" | "task";
+  id?: string;
+  deletable?: boolean;
+};
+
+/** 時間が重なるアイテムを段（tier）に振り分ける（区間グラフの貪欲彩色）。 */
+function assignTiers(items: TimelineItem[]) {
+  const sorted = [...items].sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+  const tierEnds: number[] = [];
+  const tierOf = new Map<string, number>();
+  for (const item of sorted) {
+    let tier = tierEnds.findIndex((end) => end <= item.startMin);
+    if (tier === -1) {
+      tier = tierEnds.length;
+      tierEnds.push(item.endMin);
+    } else {
+      tierEnds[tier] = item.endMin;
+    }
+    tierOf.set(item.key, tier);
+  }
+  return { tierOf, tierCount: tierEnds.length };
 }
 
 export default function DashboardTimetable({
@@ -86,6 +119,32 @@ export default function DashboardTimetable({
           const untimedTasks = tasks.filter((t) => !t.slotStart || !t.slotEnd);
           const firstBlock = row.blocks[0];
 
+          const items: TimelineItem[] = [
+            ...row.blocks.map((b, i) => ({
+              key: `b${i}`,
+              label: b.label,
+              start: b.start,
+              end: b.end,
+              startMin: toMinutes(b.start),
+              endMin: toMinutes(b.end),
+              kind: b.kind ?? "shift",
+              id: b.id,
+              deletable: b.deletable,
+            })),
+            ...timedTasks.map((t) => ({
+              key: `t${t.id}`,
+              label: t.title,
+              start: t.slotStart!,
+              end: t.slotEnd!,
+              startMin: toMinutes(t.slotStart!),
+              endMin: toMinutes(t.slotEnd!),
+              kind: "task" as const,
+              id: t.id,
+            })),
+          ];
+          const { tierOf, tierCount } = assignTiers(items);
+          const rowMinHeight = Math.max(BLOCK_HEIGHT + 8, tierCount * TIER_HEIGHT + 8);
+
           return (
             <div key={row.userId} className="border-t border-navy/10 py-4">
               <div className="flex">
@@ -123,7 +182,7 @@ export default function DashboardTimetable({
                   </div>
                 </div>
 
-                <div className="relative shrink-0" style={{ width: timelineWidth, minHeight: 88 }}>
+                <div className="relative shrink-0" style={{ width: timelineWidth, minHeight: rowMinHeight }}>
                   {hours.map((h) => (
                     <div
                       key={h}
@@ -131,43 +190,55 @@ export default function DashboardTimetable({
                       style={{ left: leftPx(h * 60) }}
                     />
                   ))}
-                  {row.blocks.map((b, i) => {
+                  {items.map((item) => {
                     const style = {
-                      left: leftPx(toMinutes(b.start)),
-                      minWidth: widthPx(toMinutes(b.start), toMinutes(b.end)),
+                      left: leftPx(item.startMin),
+                      top: tierOf.get(item.key)! * TIER_HEIGHT,
+                      minWidth: widthPx(item.startMin, item.endMin),
                     };
-                    const title = `${b.start}〜${b.end} ${b.label}${b.kind === "calendar" ? "（Googleカレンダー）" : ""}`;
-                    if (b.kind === "schedule" && b.deletable && b.id) {
-                      return <ScheduleBlock key={i} id={b.id} label={b.label} title={`${title}（クリックで削除）`} style={style} />;
+                    const title = `${item.start}〜${item.end} ${item.label}${item.kind === "calendar" ? "（Googleカレンダー）" : ""}`;
+
+                    if (item.kind === "schedule" && item.deletable && item.id) {
+                      return (
+                        <ScheduleBlock
+                          key={item.key}
+                          id={item.id}
+                          label={item.label}
+                          title={`${title}（クリックで削除）`}
+                          style={style}
+                        />
+                      );
+                    }
+                    if (item.kind === "task") {
+                      return (
+                        <Link
+                          key={item.key}
+                          href="/tasks"
+                          className={clsx(
+                            "absolute z-[1] flex items-center whitespace-nowrap rounded px-1.5 text-sm font-medium hover:z-[2]",
+                            KIND_CLASS.task,
+                          )}
+                          style={{ ...style, height: BLOCK_HEIGHT }}
+                          title={title}
+                        >
+                          {item.label}
+                        </Link>
+                      );
                     }
                     return (
                       <div
-                        key={i}
+                        key={item.key}
                         className={clsx(
-                          "absolute top-0 z-[1] flex h-7 items-center whitespace-nowrap rounded px-1.5 text-sm font-medium",
-                          KIND_CLASS[b.kind ?? ""] ?? "bg-navy/15 text-navy",
+                          "absolute z-[1] flex items-center whitespace-nowrap rounded px-1.5 text-sm font-medium",
+                          KIND_CLASS[item.kind] ?? "bg-navy/15 text-navy",
                         )}
-                        style={style}
+                        style={{ ...style, height: BLOCK_HEIGHT }}
                         title={title}
                       >
-                        {b.label}
+                        {item.label}
                       </div>
                     );
                   })}
-                  {timedTasks.map((t) => (
-                    <Link
-                      key={t.id}
-                      href="/tasks"
-                      className="absolute top-8 z-[1] flex h-7 items-center whitespace-nowrap rounded bg-coral/20 px-1.5 text-sm font-medium text-coral hover:z-[2] hover:bg-coral/30"
-                      style={{
-                        left: leftPx(toMinutes(t.slotStart!)),
-                        minWidth: widthPx(toMinutes(t.slotStart!), toMinutes(t.slotEnd!)),
-                      }}
-                      title={`${t.slotStart}〜${t.slotEnd} ${t.title}`}
-                    >
-                      {t.title}
-                    </Link>
-                  ))}
                 </div>
               </div>
 
