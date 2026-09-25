@@ -16,11 +16,14 @@ export type TimetableBlock = {
 export type TimetableRow = { userId: string; name: string; role: Role; blocks: TimetableBlock[] };
 export type ScheduledTask = { id: string; title: string; slotStart: string | null; slotEnd: string | null };
 
-const PX_PER_HOUR = 110;
+const PX_PER_HOUR = 140;
 const NAME_COL_WIDTH = 190;
-const MIN_BLOCK_WIDTH = 40;
-const BLOCK_HEIGHT = 28;
-const TIER_HEIGHT = 34;
+const MIN_BLOCK_WIDTH = 72;
+const BLOCK_HEIGHT = 42;
+const TIER_HEIGHT = 48;
+
+const BLOCK_BASE_CLASS = "absolute z-[1] overflow-hidden rounded";
+const BLOCK_LABEL_CLASS = "px-1.5 py-1 text-left text-xs font-medium leading-snug line-clamp-2";
 
 const KIND_CLASS: Record<string, string> = {
   calendar: "bg-emerald-500/15 text-emerald-700",
@@ -194,7 +197,8 @@ export default function DashboardTimetable({
                     const style = {
                       left: leftPx(item.startMin),
                       top: tierOf.get(item.key)! * TIER_HEIGHT,
-                      minWidth: widthPx(item.startMin, item.endMin),
+                      width: widthPx(item.startMin, item.endMin),
+                      height: BLOCK_HEIGHT,
                     };
                     const title = `${item.start}〜${item.end} ${item.label}${item.kind === "calendar" ? "（Googleカレンダー）" : ""}`;
 
@@ -214,28 +218,22 @@ export default function DashboardTimetable({
                         <Link
                           key={item.key}
                           href="/tasks"
-                          className={clsx(
-                            "absolute z-[1] flex items-center whitespace-nowrap rounded px-1.5 text-sm font-medium hover:z-[2]",
-                            KIND_CLASS.task,
-                          )}
-                          style={{ ...style, height: BLOCK_HEIGHT }}
+                          className={clsx(BLOCK_BASE_CLASS, "hover:z-[2]", KIND_CLASS.task)}
+                          style={style}
                           title={title}
                         >
-                          {item.label}
+                          <span className={BLOCK_LABEL_CLASS}>{item.label}</span>
                         </Link>
                       );
                     }
                     return (
                       <div
                         key={item.key}
-                        className={clsx(
-                          "absolute z-[1] flex items-center whitespace-nowrap rounded px-1.5 text-sm font-medium",
-                          KIND_CLASS[item.kind] ?? "bg-navy/15 text-navy",
-                        )}
-                        style={{ ...style, height: BLOCK_HEIGHT }}
+                        className={clsx(BLOCK_BASE_CLASS, KIND_CLASS[item.kind] ?? "bg-navy/15 text-navy")}
+                        style={style}
                         title={title}
                       >
-                        {item.label}
+                        <span className={BLOCK_LABEL_CLASS}>{item.label}</span>
                       </div>
                     );
                   })}
