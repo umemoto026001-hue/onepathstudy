@@ -9,6 +9,7 @@ import { formatDate, formatDateTime } from "@/lib/date";
 import { markTasksRead } from "@/app/actions/tasks";
 import { markConsultationsRead } from "@/app/actions/consultations";
 import TaskStatusSelect from "@/components/TaskStatusSelect";
+import DeleteTaskButton from "@/components/DeleteTaskButton";
 import ConsultationStatusSelect from "@/components/ConsultationStatusSelect";
 import type { Prisma, Task, User } from "@prisma/client";
 
@@ -160,9 +161,12 @@ function TaskCard({
           </p>
           {task.description && <p className="mt-2 whitespace-pre-wrap text-sm">{task.description}</p>}
           {canEdit && (
-            <Link href={`/tasks/${task.id}/edit`} className="mt-2 inline-block text-xs text-navy underline">
-              編集
-            </Link>
+            <div className="mt-2 flex items-center gap-3">
+              <Link href={`/tasks/${task.id}/edit`} className="text-xs text-navy underline">
+                編集
+              </Link>
+              <DeleteTaskButton id={task.id} title={task.title} />
+            </div>
           )}
         </div>
         <TaskStatusSelect id={task.id} status={task.status} />

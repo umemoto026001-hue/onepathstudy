@@ -118,6 +118,22 @@ export async function updateTask(
   redirect("/tasks");
 }
 
+export async function deleteTask(id: string) {
+  const session = await auth();
+  if (!session?.user) throw new Error("ログインが必要です。");
+
+  const existing = await prisma.task.findUnique({ where: { id } });
+  if (!existing) return;
+  if (existing.creatorId !== session.user.id) {
+    throw new Error("このタスクを削除できるのは依頼人本人のみです。");
+  }
+
+  await prisma.task.delete({ where: { id } });
+
+  revalidatePath("/tasks");
+  revalidatePath("/dashboard");
+}
+
 export async function updateTaskStatus(id: string, status: string) {
   const validStatuses = ["TODO", "IN_PROGRESS", "DONE"];
   if (!validStatuses.includes(status)) return;
