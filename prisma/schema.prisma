@@ -19,6 +19,9 @@
 // - Task.scheduledDate/slotStart/slotEnd（任意）: タスクをダッシュボードの
 //   当日タイムテーブル上の担当者の時間枠に配置するために追加した（ユーザー確認済み）。
 //   未指定のタスクは従来通りタスク一覧にのみ表示される。
+// - User.googleCalendarIcsUrl（任意）: Googleカレンダーとの簡易連携（ユーザー確認済み・
+//   「簡略版」を選択）。各自のGoogleカレンダーの非公開ICS URLを登録すると、当日の予定を
+//   ダッシュボードのタイムテーブルに表示する（読み取り専用・一方向、リアルタイムではない）。
 
 generator client {
   provider = "prisma-client-js"
@@ -91,6 +94,7 @@ model User {
   employeeNumber     String   @unique
   name               String
   email              String?
+  googleCalendarIcsUrl String?
   passwordHash       String
   role               Role
   campusId           String?

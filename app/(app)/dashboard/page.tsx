@@ -13,6 +13,7 @@ import { canManageShifts, canViewAll, canViewStudentRoster } from "@/lib/permiss
 import { classAccessWhere } from "@/lib/classAccess";
 import { formatDate, toDateParam } from "@/lib/date";
 import DashboardTimetable, { type TimetableRow } from "@/components/DashboardTimetable";
+import { fetchTodaysCalendarEvents } from "@/lib/googleCalendar";
 import type { Weekday } from "@prisma/client";
 
 const WEEKDAY_BY_JS_DAY: Weekday[] = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -35,6 +36,7 @@ export default async function DashboardPage() {
     todaysClasses,
     todaysShifts,
     todaysScheduledTasks,
+    usersWithCalendar,
     enrolledCount,
     recentInterviews,
   ] = await Promise.all([
@@ -71,6 +73,7 @@ export default async function DashboardPage() {
       },
       orderBy: { slotStart: "asc" },
     }),
+    prisma.user.findMany({ where: { googleCalendarIcsUrl: { not: null } } }),
     canViewStudentRoster(role)
       ? prisma.student.count({
           where: seeAll
@@ -96,7 +99,7 @@ export default async function DashboardPage() {
       role: shift.user.role,
       blocks: [],
     };
-    row.blocks.push({ label: "出勤", start: shift.startTime, end: shift.endTime });
+    row.blocks.push({ label: "出勤", start: shift.startTime, end: shift.endTime, kind: "shift" });
     timetableRowsByUser.set(shift.userId, row);
   }
   for (const c of todaysClasses) {
@@ -106,9 +109,38 @@ export default async function DashboardPage() {
       role: c.teacher.role,
       blocks: [],
     };
-    row.blocks.push({ label: `${c.name}（${c.subject.name}）`, start: c.startTime, end: c.endTime });
+    row.blocks.push({ label: `${c.name}（${c.subject.name}）`, start: c.startTime, end: c.endTime, kind: "class" });
     timetableRowsByUser.set(c.teacherId, row);
   }
+
+  // Googleカレンダー連携（簡易版・ICS購読）: 各自が /profile で登録したURLから
+  // 本日の予定を取得し、タイムテーブルに重ねて表示する。取得失敗は個別に握りつぶし、
+  // ダッシュボード全体は壊さない。既に行がある人はその場で「連携エラー」を表示し、
+  // シフト等が無く行自体が無い人は下の一覧にまとめて表示する。
+  const calendarErrorRowIds = new Set<string>();
+  const calendarErrorNamesWithoutRow: string[] = [];
+  const calendarResults = await Promise.allSettled(
+    usersWithCalendar.map((u) => fetchTodaysCalendarEvents(u.googleCalendarIcsUrl!, startOfToday)),
+  );
+  usersWithCalendar.forEach((u, i) => {
+    const result = calendarResults[i];
+    const existingRow = timetableRowsByUser.get(u.id);
+    if (result.status === "rejected") {
+      if (existingRow) {
+        calendarErrorRowIds.add(u.id);
+      } else {
+        calendarErrorNamesWithoutRow.push(u.name);
+      }
+      return;
+    }
+    if (result.value.length === 0) return;
+    const row = existingRow ?? { userId: u.id, name: u.name, role: u.role, blocks: [] };
+    for (const event of result.value) {
+      row.blocks.push({ label: event.label, start: event.start, end: event.end, kind: "calendar" });
+    }
+    timetableRowsByUser.set(u.id, row);
+  });
+
   const timetableRows = Array.from(timetableRowsByUser.values())
     .map((row) => ({ ...row, blocks: [...row.blocks].sort((a, b) => a.start.localeCompare(b.start)) }))
     .sort((a, b) => a.blocks[0].start.localeCompare(b.blocks[0].start));
@@ -151,11 +183,22 @@ export default async function DashboardPage() {
           )}
         </div>
         {timetableRows.length > 0 ? (
-          <DashboardTimetable rows={timetableRows} tasksByAssignee={scheduledTasksByAssignee} todayParam={todayParam} />
+          <DashboardTimetable
+            rows={timetableRows}
+            tasksByAssignee={scheduledTasksByAssignee}
+            todayParam={todayParam}
+            calendarErrorRowIds={calendarErrorRowIds}
+          />
         ) : (
           <p className="text-sm text-foreground/50">
             本日、出勤予定・授業予定の登録はありません。
             {canManageShifts(role) && "「設定」から社員のシフトを登録できます。"}
+          </p>
+        )}
+        {calendarErrorNamesWithoutRow.length > 0 && (
+          <p className="mt-2 text-xs text-coral">
+            Googleカレンダーの取得に失敗しています: {calendarErrorNamesWithoutRow.join("、")}
+            （本人の「個人設定」でURLを確認してください）
           </p>
         )}
       </Card>

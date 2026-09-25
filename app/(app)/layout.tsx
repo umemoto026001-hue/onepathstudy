@@ -28,6 +28,7 @@ export default async function AppLayout({
     { href: "/submissions", label: "演習提出" },
     ...(canViewStudentRoster(role) ? [{ href: "/interviews", label: "面談記録" }] : []),
     ...(canManageSettings(role) ? [{ href: "/settings", label: "設定" }] : []),
+    { href: "/profile", label: "個人設定" },
   ];
 
   return (

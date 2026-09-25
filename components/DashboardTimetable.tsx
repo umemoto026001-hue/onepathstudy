@@ -1,9 +1,10 @@
 import Link from "next/link";
+import clsx from "clsx";
 import type { Role } from "@prisma/client";
 import { Badge } from "@/components/ui";
 import { ROLE_LABEL } from "@/lib/permissions";
 
-export type TimetableBlock = { label: string; start: string; end: string };
+export type TimetableBlock = { label: string; start: string; end: string; kind?: "shift" | "class" | "calendar" };
 export type TimetableRow = { userId: string; name: string; role: Role; blocks: TimetableBlock[] };
 export type ScheduledTask = { id: string; title: string; slotStart: string | null; slotEnd: string | null };
 
@@ -20,10 +21,12 @@ export default function DashboardTimetable({
   rows,
   tasksByAssignee,
   todayParam,
+  calendarErrorRowIds,
 }: {
   rows: TimetableRow[];
   tasksByAssignee: Map<string, ScheduledTask[]>;
   todayParam: string;
+  calendarErrorRowIds?: Set<string>;
 }) {
   if (rows.length === 0) {
     return null;
@@ -77,7 +80,17 @@ export default function DashboardTimetable({
                   className="sticky left-0 z-10 flex shrink-0 flex-col justify-center gap-1 bg-white pr-2"
                   style={{ width: NAME_COL_WIDTH }}
                 >
-                  <span className="truncate text-sm font-medium text-navy">{row.name}</span>
+                  <span className="flex items-center gap-1 truncate text-sm font-medium text-navy">
+                    {row.name}
+                    {calendarErrorRowIds?.has(row.userId) && (
+                      <span
+                        className="rounded bg-coral/10 px-1 text-[10px] font-medium text-coral"
+                        title="Googleカレンダーの取得に失敗しています（個人設定でURLを確認してください）"
+                      >
+                        連携エラー
+                      </span>
+                    )}
+                  </span>
                   <div className="flex items-center gap-1.5">
                     <Badge>{ROLE_LABEL[row.role]}</Badge>
                     <Link
@@ -101,12 +114,15 @@ export default function DashboardTimetable({
                   {row.blocks.map((b, i) => (
                     <div
                       key={i}
-                      className="absolute top-0 z-[1] flex h-5 items-center whitespace-nowrap rounded bg-navy/15 px-1.5 text-[11px] font-medium text-navy"
+                      className={clsx(
+                        "absolute top-0 z-[1] flex h-5 items-center whitespace-nowrap rounded px-1.5 text-[11px] font-medium",
+                        b.kind === "calendar" ? "bg-emerald-500/15 text-emerald-700" : "bg-navy/15 text-navy",
+                      )}
                       style={{
                         left: leftPx(toMinutes(b.start)),
                         minWidth: widthPx(toMinutes(b.start), toMinutes(b.end)),
                       }}
-                      title={`${b.start}〜${b.end} ${b.label}`}
+                      title={`${b.start}〜${b.end} ${b.label}${b.kind === "calendar" ? "（Googleカレンダー）" : ""}`}
                     >
                       {b.label}
                     </div>
