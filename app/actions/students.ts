@@ -3,7 +3,10 @@
 import { z } from "zod";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { canManageHandoverNotes } from "@/lib/permissions";
+import type { Role } from "@prisma/client";
 
 const studentSchema = z.object({
   studentNumber: z.string().min(1, "生徒番号を入力してください"),
@@ -94,4 +97,25 @@ export async function updateStudent(
   revalidatePath("/students");
   revalidatePath(`/students/${id}`);
   redirect(`/students/${id}`);
+}
+
+export async function addHandoverNote(
+  studentId: string,
+  _prevState: string | undefined,
+  formData: FormData,
+) {
+  const session = await auth();
+  if (!session?.user || !canManageHandoverNotes(session.user.role as Role)) {
+    return "権限がありません。";
+  }
+
+  const content = String(formData.get("content") ?? "").trim();
+  if (!content) return "内容を入力してください。";
+
+  await prisma.handoverNote.create({
+    data: { studentId, authorId: session.user.id, content },
+  });
+
+  revalidatePath(`/students/${studentId}`);
+  return undefined;
 }

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { fetchTodaysCalendarEvents } from "@/lib/googleCalendar";
+import { fetchCalendarEventsForDay } from "@/lib/googleCalendar";
 
 const urlSchema = z
   .string()
@@ -28,7 +28,7 @@ export async function updateGoogleCalendarUrl(
 
   if (url) {
     try {
-      await fetchTodaysCalendarEvents(url, new Date());
+      await fetchCalendarEventsForDay(url, new Date());
     } catch {
       return "このURLからカレンダーを取得できませんでした。URLを確認してください。";
     }

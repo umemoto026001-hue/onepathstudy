@@ -8,9 +8,9 @@ export type TimetableBlock = { label: string; start: string; end: string; kind?:
 export type TimetableRow = { userId: string; name: string; role: Role; blocks: TimetableBlock[] };
 export type ScheduledTask = { id: string; title: string; slotStart: string | null; slotEnd: string | null };
 
-const PX_PER_HOUR = 64;
-const NAME_COL_WIDTH = 150;
-const MIN_BLOCK_WIDTH = 28;
+const PX_PER_HOUR = 84;
+const NAME_COL_WIDTH = 170;
+const MIN_BLOCK_WIDTH = 32;
 
 function toMinutes(hhmm: string) {
   const [h, m] = hhmm.split(":").map(Number);
@@ -20,12 +20,12 @@ function toMinutes(hhmm: string) {
 export default function DashboardTimetable({
   rows,
   tasksByAssignee,
-  todayParam,
+  dateParam,
   calendarErrorRowIds,
 }: {
   rows: TimetableRow[];
   tasksByAssignee: Map<string, ScheduledTask[]>;
-  todayParam: string;
+  dateParam: string;
   calendarErrorRowIds?: Set<string>;
 }) {
   if (rows.length === 0) {
@@ -54,11 +54,11 @@ export default function DashboardTimetable({
       <div style={{ width: NAME_COL_WIDTH + timelineWidth }}>
         <div className="flex">
           <div className="sticky left-0 z-10 shrink-0 bg-white" style={{ width: NAME_COL_WIDTH }} />
-          <div className="relative h-6 shrink-0" style={{ width: timelineWidth }}>
+          <div className="relative h-7 shrink-0" style={{ width: timelineWidth }}>
             {hours.map((h) => (
               <span
                 key={h}
-                className="absolute text-xs text-foreground/50"
+                className="absolute text-sm text-foreground/50"
                 style={{ left: leftPx(h * 60) }}
               >
                 {h}:00
@@ -74,13 +74,13 @@ export default function DashboardTimetable({
           const firstBlock = row.blocks[0];
 
           return (
-            <div key={row.userId} className="border-t border-navy/10 py-2">
+            <div key={row.userId} className="border-t border-navy/10 py-3">
               <div className="flex">
                 <div
-                  className="sticky left-0 z-10 flex shrink-0 flex-col justify-center gap-1 bg-white pr-2"
+                  className="sticky left-0 z-10 flex shrink-0 flex-col justify-center gap-1.5 bg-white pr-2"
                   style={{ width: NAME_COL_WIDTH }}
                 >
-                  <span className="flex items-center gap-1 truncate text-sm font-medium text-navy">
+                  <span className="flex items-center gap-1 truncate text-base font-medium text-navy">
                     {row.name}
                     {calendarErrorRowIds?.has(row.userId) && (
                       <span
@@ -94,7 +94,7 @@ export default function DashboardTimetable({
                   <div className="flex items-center gap-1.5">
                     <Badge>{ROLE_LABEL[row.role]}</Badge>
                     <Link
-                      href={`/tasks/new?assigneeId=${row.userId}&date=${todayParam}&start=${firstBlock.start}&end=${firstBlock.end}`}
+                      href={`/tasks/new?assigneeId=${row.userId}&date=${dateParam}&start=${firstBlock.start}&end=${firstBlock.end}`}
                       className="text-xs text-coral underline"
                       title="この人にタスクを貼る"
                     >
@@ -103,7 +103,7 @@ export default function DashboardTimetable({
                   </div>
                 </div>
 
-                <div className="relative shrink-0" style={{ width: timelineWidth, minHeight: 48 }}>
+                <div className="relative shrink-0" style={{ width: timelineWidth, minHeight: 60 }}>
                   {hours.map((h) => (
                     <div
                       key={h}
@@ -115,7 +115,7 @@ export default function DashboardTimetable({
                     <div
                       key={i}
                       className={clsx(
-                        "absolute top-0 z-[1] flex h-5 items-center whitespace-nowrap rounded px-1.5 text-[11px] font-medium",
+                        "absolute top-0 z-[1] flex h-6 items-center whitespace-nowrap rounded px-1.5 text-xs font-medium",
                         b.kind === "calendar" ? "bg-emerald-500/15 text-emerald-700" : "bg-navy/15 text-navy",
                       )}
                       style={{
@@ -131,7 +131,7 @@ export default function DashboardTimetable({
                     <Link
                       key={t.id}
                       href="/tasks"
-                      className="absolute top-6 z-[1] flex h-5 items-center whitespace-nowrap rounded bg-coral/20 px-1.5 text-[11px] font-medium text-coral hover:z-[2] hover:bg-coral/30"
+                      className="absolute top-7 z-[1] flex h-6 items-center whitespace-nowrap rounded bg-coral/20 px-1.5 text-xs font-medium text-coral hover:z-[2] hover:bg-coral/30"
                       style={{
                         left: leftPx(toMinutes(t.slotStart!)),
                         minWidth: widthPx(toMinutes(t.slotStart!), toMinutes(t.slotEnd!)),

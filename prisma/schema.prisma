@@ -22,6 +22,14 @@
 // - User.googleCalendarIcsUrl（任意）: Googleカレンダーとの簡易連携（ユーザー確認済み・
 //   「簡略版」を選択）。各自のGoogleカレンダーの非公開ICS URLを登録すると、当日の予定を
 //   ダッシュボードのタイムテーブルに表示する（読み取り専用・一方向、リアルタイムではない）。
+// - HandoverNote（生徒ごとの引き継ぎメモ）: 提案書に明記はないが、月次面談記録ほど
+//   正式でない日々の申し送りを共有するために追加した（ユーザー確認済み）。生徒名簿への
+//   アクセス権限（3-7）をそのまま流用するため、閲覧・投稿できるのは講師以外の役職。
+//   編集・削除は設けず、投稿のみ（Consultationと同じ簡易方針）。
+// - Announcement（一斉連絡の送信履歴）: 生徒の保護者へメールで一斉連絡できる機能を
+//   追加した（ユーザー確認済み）。Student.parentContact はメールアドレスとは限らない
+//   自由記述のため、メール形式に見える宛先にのみ送信し、送れなかった件数を
+//   skippedCount として記録する（宛先の妥当性チェックは行わない）。
 
 generator client {
   provider = "prisma-client-js"
@@ -85,6 +93,7 @@ model Campus {
   users    User[]
   students Student[]
   classes  Class[]
+  announcements Announcement[]
 
   createdAt DateTime @default(now())
 }
@@ -110,6 +119,8 @@ model User {
   recordedAttendances   Attendance[]   @relation("AttendanceRecordedBy")
   recordedSubmissions   Submission[]   @relation("SubmissionRecordedBy")
   recordedInterviews    Interview[]    @relation("InterviewRecordedBy")
+  handoverNotes         HandoverNote[] @relation("HandoverNoteAuthor")
+  sentAnnouncements     Announcement[] @relation("AnnouncementSender")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -142,6 +153,7 @@ model Student {
   consultations    Consultation[]
   attendances      Attendance[]
   submissions      Submission[]
+  handoverNotes    HandoverNote[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -162,8 +174,9 @@ model Class {
   campusId  String?
   campus    Campus?   @relation(fields: [campusId], references: [id])
 
-  enrollments ClassEnrollment[]
-  sessions    ClassSession[]
+  enrollments   ClassEnrollment[]
+  sessions      ClassSession[]
+  announcements Announcement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -297,4 +310,33 @@ model Consultation {
   updatedAt DateTime @updatedAt
 
   @@index([assigneeId])
+}
+
+model HandoverNote {
+  id        String   @id @default(cuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation("HandoverNoteAuthor", fields: [authorId], references: [id])
+  content   String
+
+  createdAt DateTime @default(now())
+
+  @@index([studentId])
+}
+
+model Announcement {
+  id             String   @id @default(cuid())
+  title          String
+  content        String
+  senderId       String
+  sender         User     @relation("AnnouncementSender", fields: [senderId], references: [id])
+  campusId       String?
+  campus         Campus?  @relation(fields: [campusId], references: [id])
+  classId        String?
+  class          Class?   @relation(fields: [classId], references: [id])
+  recipientCount Int
+  skippedCount   Int
+
+  createdAt DateTime @default(now())
 }

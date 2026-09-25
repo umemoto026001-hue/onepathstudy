@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { logout } from "@/app/actions/auth";
 import NavBar, { type NavItem } from "@/components/NavBar";
-import { canManageSettings, canViewStudentRoster, ROLE_LABEL } from "@/lib/permissions";
+import { canManageSettings, canSendAnnouncements, canViewStudentRoster, ROLE_LABEL } from "@/lib/permissions";
 
 export default async function AppLayout({
   children,
@@ -27,6 +27,7 @@ export default async function AppLayout({
     { href: "/attendance", label: "出欠" },
     { href: "/submissions", label: "演習提出" },
     ...(canViewStudentRoster(role) ? [{ href: "/interviews", label: "面談記録" }] : []),
+    ...(canSendAnnouncements(role) ? [{ href: "/announcements", label: "一斉連絡" }] : []),
     ...(canManageSettings(role) ? [{ href: "/settings", label: "設定" }] : []),
     { href: "/profile", label: "個人設定" },
   ];

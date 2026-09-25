@@ -1,34 +1,42 @@
 import Link from "next/link";
+import { addDays, subDays } from "date-fns";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { Badge, Card, LinkButton, PageHeader } from "@/components/ui";
+import { Badge, Card, Input, LinkButton, PageHeader } from "@/components/ui";
 import {
   CONSULTATION_STATUS_BADGE,
   CONSULTATION_STATUS_LABEL,
   TASK_STATUS_BADGE,
   TASK_STATUS_LABEL,
-  WEEKDAY_LABEL,
 } from "@/lib/labels";
 import { canManageShifts, canViewAll, canViewStudentRoster } from "@/lib/permissions";
 import { classAccessWhere } from "@/lib/classAccess";
-import { formatDate, toDateParam } from "@/lib/date";
+import { formatDate, formatDayShort, toDateParam } from "@/lib/date";
 import DashboardTimetable, { type TimetableRow } from "@/components/DashboardTimetable";
-import { fetchTodaysCalendarEvents } from "@/lib/googleCalendar";
+import { fetchCalendarEventsForDay } from "@/lib/googleCalendar";
 import type { Weekday } from "@prisma/client";
 
 const WEEKDAY_BY_JS_DAY: Weekday[] = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string }>;
+}) {
   const session = await auth();
   const userId = session!.user.id;
   const role = session!.user.role as "TEACHER" | "STAFF" | "HQ" | "EXECUTIVE";
   const seeAll = canViewAll(role);
-  const todayWeekday = WEEKDAY_BY_JS_DAY[new Date().getDay()];
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const startOfTomorrow = new Date(startOfToday);
-  startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
-  const todayParam = toDateParam(startOfToday);
+
+  const { date } = await searchParams;
+  const todayParam = toDateParam(new Date());
+  const startOfSelectedDay = date ? new Date(`${date}T00:00:00`) : new Date();
+  startOfSelectedDay.setHours(0, 0, 0, 0);
+  const startOfNextDay = new Date(startOfSelectedDay);
+  startOfNextDay.setDate(startOfNextDay.getDate() + 1);
+  const selectedDateParam = toDateParam(startOfSelectedDay);
+  const selectedWeekday = WEEKDAY_BY_JS_DAY[startOfSelectedDay.getDay()];
+  const isToday = selectedDateParam === todayParam;
 
   const [
     myTasks,
@@ -56,12 +64,12 @@ export default async function DashboardPage() {
       take: 5,
     }),
     prisma.class.findMany({
-      where: { ...classAccessWhere(role, userId, session!.user.campusId), weekday: todayWeekday },
+      where: { ...classAccessWhere(role, userId, session!.user.campusId), weekday: selectedWeekday },
       include: { subject: true, teacher: true },
       orderBy: { startTime: "asc" },
     }),
     prisma.workShift.findMany({
-      where: { weekday: todayWeekday },
+      where: { weekday: selectedWeekday },
       include: { user: true },
       orderBy: { startTime: "asc" },
     }),
@@ -69,7 +77,7 @@ export default async function DashboardPage() {
       // タイムテーブルに貼られたタスクも、依頼人・担当者以外には見せない。
       where: {
         OR: [{ assigneeId: userId }, { creatorId: userId }],
-        scheduledDate: { gte: startOfToday, lt: startOfTomorrow },
+        scheduledDate: { gte: startOfSelectedDay, lt: startOfNextDay },
       },
       orderBy: { slotStart: "asc" },
     }),
@@ -120,7 +128,7 @@ export default async function DashboardPage() {
   const calendarErrorRowIds = new Set<string>();
   const calendarErrorNamesWithoutRow: string[] = [];
   const calendarResults = await Promise.allSettled(
-    usersWithCalendar.map((u) => fetchTodaysCalendarEvents(u.googleCalendarIcsUrl!, startOfToday)),
+    usersWithCalendar.map((u) => fetchCalendarEventsForDay(u.googleCalendarIcsUrl!, startOfSelectedDay)),
   );
   usersWithCalendar.forEach((u, i) => {
     const result = calendarResults[i];
@@ -171,10 +179,11 @@ export default async function DashboardPage() {
         }
       />
 
-      <Card>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-heading text-lg font-bold text-navy">
-            本日（{WEEKDAY_LABEL[todayWeekday]}曜日）のタイムテーブル
+      <Card className="p-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-heading text-2xl font-bold text-navy">
+            {formatDate(startOfSelectedDay)}のタイムテーブル
+            {isToday && <span className="ml-2 text-sm font-normal text-coral">本日</span>}
           </h2>
           {canManageShifts(role) && (
             <Link href="/settings" className="text-sm text-coral underline">
@@ -182,16 +191,46 @@ export default async function DashboardPage() {
             </Link>
           )}
         </div>
+
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <Link
+            href={`/dashboard?date=${toDateParam(subDays(startOfSelectedDay, 1))}`}
+            className="rounded-lg border border-navy/20 px-3 py-1.5 text-sm hover:bg-navy/5"
+          >
+            ← 前日
+          </Link>
+          <Link
+            href={`/dashboard?date=${toDateParam(addDays(startOfSelectedDay, 1))}`}
+            className="rounded-lg border border-navy/20 px-3 py-1.5 text-sm hover:bg-navy/5"
+          >
+            翌日 →
+          </Link>
+          {!isToday && (
+            <Link href="/dashboard" className="rounded-lg border border-navy/20 px-3 py-1.5 text-sm hover:bg-navy/5">
+              今日に戻る
+            </Link>
+          )}
+          <form method="get" className="flex items-center gap-2">
+            <Input id="date" name="date" type="date" defaultValue={selectedDateParam} className="py-1.5" />
+            <button
+              type="submit"
+              className="rounded-lg bg-navy px-3 py-1.5 text-sm font-bold text-white hover:opacity-90"
+            >
+              表示
+            </button>
+          </form>
+        </div>
+
         {timetableRows.length > 0 ? (
           <DashboardTimetable
             rows={timetableRows}
             tasksByAssignee={scheduledTasksByAssignee}
-            todayParam={todayParam}
+            dateParam={selectedDateParam}
             calendarErrorRowIds={calendarErrorRowIds}
           />
         ) : (
           <p className="text-sm text-foreground/50">
-            本日、出勤予定・授業予定の登録はありません。
+            {isToday ? "本日" : `${formatDayShort(startOfSelectedDay)}`}、出勤予定・授業予定の登録はありません。
             {canManageShifts(role) && "「設定」から社員のシフトを登録できます。"}
           </p>
         )}

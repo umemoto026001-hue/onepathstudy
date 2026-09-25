@@ -10,6 +10,7 @@ import {
 } from "@/lib/labels";
 import { canViewAll, canViewStudentRoster } from "@/lib/permissions";
 import { formatDate, formatDateTime } from "@/lib/date";
+import HandoverNoteForm from "@/components/HandoverNoteForm";
 
 export default async function StudentDetailPage({
   params,
@@ -31,6 +32,7 @@ export default async function StudentDetailPage({
       classEnrollments: { include: { class: { include: { subject: true, teacher: true } } } },
       interviews: { include: { recordedBy: true }, orderBy: { date: "desc" } },
       consultations: { include: { poster: true, assignee: true }, orderBy: { createdAt: "desc" } },
+      handoverNotes: { include: { author: true }, orderBy: { createdAt: "desc" } },
     },
   });
 
@@ -114,6 +116,28 @@ export default async function StudentDetailPage({
           </ul>
         </Card>
       </div>
+
+      <Card>
+        <h2 className="mb-1 font-heading text-lg font-bold text-navy">引き継ぎメモ</h2>
+        <p className="mb-3 text-xs text-foreground/50">
+          面談記録ほど正式でない、日々のちょっとした申し送り用のメモです。
+        </p>
+        <HandoverNoteForm studentId={student.id} />
+        <ul className="mt-4 space-y-3">
+          {student.handoverNotes.map((note) => (
+            <li key={note.id} className="border-l-2 border-navy/20 pl-3 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-navy/60">{note.author.name}</span>
+                <span className="text-xs text-foreground/40">{formatDateTime(note.createdAt)}</span>
+              </div>
+              <p className="mt-1 whitespace-pre-wrap">{note.content}</p>
+            </li>
+          ))}
+          {student.handoverNotes.length === 0 && (
+            <p className="text-sm text-foreground/50">引き継ぎメモはまだありません。</p>
+          )}
+        </ul>
+      </Card>
 
       <Card>
         <h2 className="mb-3 font-heading text-lg font-bold text-navy">月次面談記録</h2>

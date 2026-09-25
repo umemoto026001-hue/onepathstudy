@@ -57,3 +57,13 @@ export function canManageShifts(role: Role) {
 export function canEditTask(isCreator: boolean) {
   return isCreator;
 }
+
+/** 生徒への引き継ぎメモの閲覧・投稿ができるか（生徒名簿アクセス権限と同じ） */
+export function canManageHandoverNotes(role: Role) {
+  return role !== "TEACHER";
+}
+
+/** 保護者への一斉連絡を送信できるか（生徒名簿アクセス権限と同じ） */
+export function canSendAnnouncements(role: Role) {
+  return role !== "TEACHER";
+}

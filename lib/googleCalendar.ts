@@ -17,7 +17,7 @@ function summaryText(summary: VEvent["summary"]) {
  * ネットワークエラー・パースエラーはすべて呼び出し側に例外として伝える
  * （呼び出し側で握りつぶしてダッシュボード全体を壊さないようにする）。
  */
-export async function fetchTodaysCalendarEvents(icsUrl: string, day: Date): Promise<CalendarEvent[]> {
+export async function fetchCalendarEventsForDay(icsUrl: string, day: Date): Promise<CalendarEvent[]> {
   const startOfDay = new Date(day);
   startOfDay.setHours(0, 0, 0, 0);
   const endOfDay = new Date(startOfDay);
