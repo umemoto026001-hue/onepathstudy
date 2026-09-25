@@ -30,6 +30,11 @@
 //   追加した（ユーザー確認済み）。Student.parentContact はメールアドレスとは限らない
 //   自由記述のため、メール形式に見える宛先にのみ送信し、送れなかった件数を
 //   skippedCount として記録する（宛先の妥当性チェックは行わない）。
+// - Schedule（タスクとは別の予定・スケジュール）: 「対応が必要なタスク」と「単に時間を
+//   ブロックする予定（会議・出張など）」は概念が異なるため、Taskとは別モデルとして
+//   追加した（ユーザー確認済み）。ステータス（未対応/対応中/完了）を持たない点がTaskとの
+//   違い。WorkShift・Classと同様に組織内で共有される情報とみなし、タイムテーブル上は
+//   誰でも閲覧できる（Taskのような依頼人・担当者限定の可視性制限は設けない）。
 
 generator client {
   provider = "prisma-client-js"
@@ -121,6 +126,8 @@ model User {
   recordedInterviews    Interview[]    @relation("InterviewRecordedBy")
   handoverNotes         HandoverNote[] @relation("HandoverNoteAuthor")
   sentAnnouncements     Announcement[] @relation("AnnouncementSender")
+  ownedSchedules        Schedule[]     @relation("ScheduleOwner")
+  createdSchedules      Schedule[]     @relation("ScheduleCreator")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -339,4 +346,23 @@ model Announcement {
   skippedCount   Int
 
   createdAt DateTime @default(now())
+}
+
+model Schedule {
+  id        String   @id @default(cuid())
+  title     String
+  note      String?
+  ownerId   String
+  owner     User     @relation("ScheduleOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  creatorId String
+  creator   User     @relation("ScheduleCreator", fields: [creatorId], references: [id])
+  date      DateTime
+  startTime String
+  endTime   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([date])
 }

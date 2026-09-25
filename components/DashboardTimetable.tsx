@@ -3,14 +3,27 @@ import clsx from "clsx";
 import type { Role } from "@prisma/client";
 import { Badge } from "@/components/ui";
 import { ROLE_LABEL } from "@/lib/permissions";
+import ScheduleBlock from "@/components/ScheduleBlock";
 
-export type TimetableBlock = { label: string; start: string; end: string; kind?: "shift" | "class" | "calendar" };
+export type TimetableBlock = {
+  label: string;
+  start: string;
+  end: string;
+  kind?: "shift" | "class" | "calendar" | "schedule";
+  id?: string;
+  deletable?: boolean;
+};
 export type TimetableRow = { userId: string; name: string; role: Role; blocks: TimetableBlock[] };
 export type ScheduledTask = { id: string; title: string; slotStart: string | null; slotEnd: string | null };
 
-const PX_PER_HOUR = 84;
-const NAME_COL_WIDTH = 170;
-const MIN_BLOCK_WIDTH = 32;
+const PX_PER_HOUR = 110;
+const NAME_COL_WIDTH = 190;
+const MIN_BLOCK_WIDTH = 40;
+
+const KIND_CLASS: Record<string, string> = {
+  calendar: "bg-emerald-500/15 text-emerald-700",
+  schedule: "bg-violet-500/15 text-violet-700",
+};
 
 function toMinutes(hhmm: string) {
   const [h, m] = hhmm.split(":").map(Number);
@@ -54,11 +67,11 @@ export default function DashboardTimetable({
       <div style={{ width: NAME_COL_WIDTH + timelineWidth }}>
         <div className="flex">
           <div className="sticky left-0 z-10 shrink-0 bg-white" style={{ width: NAME_COL_WIDTH }} />
-          <div className="relative h-7 shrink-0" style={{ width: timelineWidth }}>
+          <div className="relative h-8 shrink-0" style={{ width: timelineWidth }}>
             {hours.map((h) => (
               <span
                 key={h}
-                className="absolute text-sm text-foreground/50"
+                className="absolute text-base text-foreground/50"
                 style={{ left: leftPx(h * 60) }}
               >
                 {h}:00
@@ -74,13 +87,13 @@ export default function DashboardTimetable({
           const firstBlock = row.blocks[0];
 
           return (
-            <div key={row.userId} className="border-t border-navy/10 py-3">
+            <div key={row.userId} className="border-t border-navy/10 py-4">
               <div className="flex">
                 <div
                   className="sticky left-0 z-10 flex shrink-0 flex-col justify-center gap-1.5 bg-white pr-2"
                   style={{ width: NAME_COL_WIDTH }}
                 >
-                  <span className="flex items-center gap-1 truncate text-base font-medium text-navy">
+                  <span className="flex items-center gap-1 truncate text-lg font-medium text-navy">
                     {row.name}
                     {calendarErrorRowIds?.has(row.userId) && (
                       <span
@@ -100,10 +113,17 @@ export default function DashboardTimetable({
                     >
                       ＋タスク
                     </Link>
+                    <Link
+                      href={`/schedules/new?ownerId=${row.userId}&date=${dateParam}&start=${firstBlock.start}&end=${firstBlock.end}`}
+                      className="text-xs text-navy underline"
+                      title="この人に予定を貼る"
+                    >
+                      ＋予定
+                    </Link>
                   </div>
                 </div>
 
-                <div className="relative shrink-0" style={{ width: timelineWidth, minHeight: 60 }}>
+                <div className="relative shrink-0" style={{ width: timelineWidth, minHeight: 88 }}>
                   {hours.map((h) => (
                     <div
                       key={h}
@@ -111,27 +131,34 @@ export default function DashboardTimetable({
                       style={{ left: leftPx(h * 60) }}
                     />
                   ))}
-                  {row.blocks.map((b, i) => (
-                    <div
-                      key={i}
-                      className={clsx(
-                        "absolute top-0 z-[1] flex h-6 items-center whitespace-nowrap rounded px-1.5 text-xs font-medium",
-                        b.kind === "calendar" ? "bg-emerald-500/15 text-emerald-700" : "bg-navy/15 text-navy",
-                      )}
-                      style={{
-                        left: leftPx(toMinutes(b.start)),
-                        minWidth: widthPx(toMinutes(b.start), toMinutes(b.end)),
-                      }}
-                      title={`${b.start}〜${b.end} ${b.label}${b.kind === "calendar" ? "（Googleカレンダー）" : ""}`}
-                    >
-                      {b.label}
-                    </div>
-                  ))}
+                  {row.blocks.map((b, i) => {
+                    const style = {
+                      left: leftPx(toMinutes(b.start)),
+                      minWidth: widthPx(toMinutes(b.start), toMinutes(b.end)),
+                    };
+                    const title = `${b.start}〜${b.end} ${b.label}${b.kind === "calendar" ? "（Googleカレンダー）" : ""}`;
+                    if (b.kind === "schedule" && b.deletable && b.id) {
+                      return <ScheduleBlock key={i} id={b.id} label={b.label} title={`${title}（クリックで削除）`} style={style} />;
+                    }
+                    return (
+                      <div
+                        key={i}
+                        className={clsx(
+                          "absolute top-0 z-[1] flex h-7 items-center whitespace-nowrap rounded px-1.5 text-sm font-medium",
+                          KIND_CLASS[b.kind ?? ""] ?? "bg-navy/15 text-navy",
+                        )}
+                        style={style}
+                        title={title}
+                      >
+                        {b.label}
+                      </div>
+                    );
+                  })}
                   {timedTasks.map((t) => (
                     <Link
                       key={t.id}
                       href="/tasks"
-                      className="absolute top-7 z-[1] flex h-6 items-center whitespace-nowrap rounded bg-coral/20 px-1.5 text-xs font-medium text-coral hover:z-[2] hover:bg-coral/30"
+                      className="absolute top-8 z-[1] flex h-7 items-center whitespace-nowrap rounded bg-coral/20 px-1.5 text-sm font-medium text-coral hover:z-[2] hover:bg-coral/30"
                       style={{
                         left: leftPx(toMinutes(t.slotStart!)),
                         minWidth: widthPx(toMinutes(t.slotStart!), toMinutes(t.slotEnd!)),

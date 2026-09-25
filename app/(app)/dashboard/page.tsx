@@ -44,6 +44,7 @@ export default async function DashboardPage({
     todaysClasses,
     todaysShifts,
     todaysScheduledTasks,
+    todaysSchedules,
     usersWithCalendar,
     enrolledCount,
     recentInterviews,
@@ -80,6 +81,11 @@ export default async function DashboardPage({
         scheduledDate: { gte: startOfSelectedDay, lt: startOfNextDay },
       },
       orderBy: { slotStart: "asc" },
+    }),
+    prisma.schedule.findMany({
+      where: { date: { gte: startOfSelectedDay, lt: startOfNextDay } },
+      include: { owner: true },
+      orderBy: { startTime: "asc" },
     }),
     prisma.user.findMany({ where: { googleCalendarIcsUrl: { not: null } } }),
     canViewStudentRoster(role)
@@ -119,6 +125,23 @@ export default async function DashboardPage({
     };
     row.blocks.push({ label: `${c.name}（${c.subject.name}）`, start: c.startTime, end: c.endTime, kind: "class" });
     timetableRowsByUser.set(c.teacherId, row);
+  }
+  for (const s of todaysSchedules) {
+    const row = timetableRowsByUser.get(s.ownerId) ?? {
+      userId: s.ownerId,
+      name: s.owner.name,
+      role: s.owner.role,
+      blocks: [],
+    };
+    row.blocks.push({
+      label: s.title,
+      start: s.startTime,
+      end: s.endTime,
+      kind: "schedule",
+      id: s.id,
+      deletable: s.ownerId === userId || s.creatorId === userId,
+    });
+    timetableRowsByUser.set(s.ownerId, row);
   }
 
   // Googleカレンダー連携（簡易版・ICS購読）: 各自が /profile で登録したURLから
@@ -167,7 +190,10 @@ export default async function DashboardPage({
         actions={
           <>
             <LinkButton href="/tasks/new">タスクを登録する</LinkButton>
-            <LinkButton href="/consultations/new" variant="secondary">
+            <LinkButton href={`/schedules/new?date=${selectedDateParam}`} variant="secondary">
+              スケジュールを登録する
+            </LinkButton>
+            <LinkButton href="/consultations/new" variant="ghost">
               相談を投稿する
             </LinkButton>
             {canViewStudentRoster(role) && (
